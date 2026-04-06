@@ -1,17 +1,18 @@
 /**
  * TradingView Lightweight Charts v4 기반 차트 렌더링
- * MA50 / MA100 / MA200 이동평균선 + 볼린저 밴드 + RSI + MACD
+ * MA5/20/50/100/200 이동평균선 + 볼린저 밴드
+ * 타임프레임: 1분봉 / 3분봉 / 10분봉 / 일봉
  */
 
-let mainChart = null, volumeChart = null, rsiChart = null, macdChart = null;
+let mainChart = null, volumeChart = null;
 let candleSeries = null, volumeSeries = null;
 let ma5Series = null, ma20Series = null, ma50Series = null, ma100Series = null, ma200Series = null;
 let bbUpperSeries = null, bbMiddleSeries = null, bbLowerSeries = null;
-let rsiSeries = null, macdLineSeries = null, macdSigSeries = null, macdHistSeries = null;
 
 let currentSymbol = '';
 let currentData = null;
-let visibleDays = 132; // 기본 6개월
+let currentTimeframe = 'day';
+let visibleDays = 66;
 
 var CHART_BG = '#131722';
 var GRID_COLOR = '#1e222d';
@@ -23,10 +24,22 @@ function initChart(symbol) {
 
     createMainChart();
     createVolumeChart();
-    createRsiChart();
-    createMacdChart();
 
-    // 기간 탭
+    // 타임프레임 탭 (1분/3분/10분/일)
+    document.querySelectorAll('.timeframe-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('.timeframe-btn').forEach(function(b) { b.classList.remove('active'); });
+            btn.classList.add('active');
+            currentTimeframe = btn.dataset.tf;
+
+            var periodGroup = document.getElementById('periodBtnGroup');
+            if (periodGroup) periodGroup.style.display = currentTimeframe === 'day' ? 'inline-flex' : 'none';
+
+            loadChartData(currentSymbol);
+        });
+    });
+
+    // 기간 탭 (일봉 전용)
     document.querySelectorAll('.period-btn').forEach(function(btn) {
         btn.addEventListener('click', function() {
             document.querySelectorAll('.period-btn').forEach(function(b) { b.classList.remove('active'); });
@@ -37,11 +50,11 @@ function initChart(symbol) {
     });
 
     // 이동평균선 토글
-    setupCheckbox('chkMA5', ma5Series);
-    setupCheckbox('chkMA20', ma20Series);
-    setupCheckbox('chkMA50', ma50Series);
-    setupCheckbox('chkMA100', ma100Series);
-    setupCheckbox('chkMA200', ma200Series);
+    setupCheckbox('chkMA5', function() { return ma5Series; });
+    setupCheckbox('chkMA20', function() { return ma20Series; });
+    setupCheckbox('chkMA50', function() { return ma50Series; });
+    setupCheckbox('chkMA100', function() { return ma100Series; });
+    setupCheckbox('chkMA200', function() { return ma200Series; });
 
     // 볼린저 밴드 토글
     var chkBB = document.getElementById('chkBollinger');
@@ -50,24 +63,6 @@ function initChart(symbol) {
             toggleSeries(bbUpperSeries, e.target.checked);
             toggleSeries(bbMiddleSeries, e.target.checked);
             toggleSeries(bbLowerSeries, e.target.checked);
-        });
-    }
-
-    // RSI 토글
-    var chkRSI = document.getElementById('chkRSI');
-    if (chkRSI) {
-        chkRSI.addEventListener('change', function(e) {
-            document.getElementById('rsiPanel').style.display = e.target.checked ? 'block' : 'none';
-            if (currentData) renderRsi(currentData);
-        });
-    }
-
-    // MACD 토글
-    var chkMACD = document.getElementById('chkMACD');
-    if (chkMACD) {
-        chkMACD.addEventListener('change', function(e) {
-            document.getElementById('macdPanel').style.display = e.target.checked ? 'block' : 'none';
-            if (currentData) renderMacd(currentData);
         });
     }
 
@@ -100,10 +95,10 @@ function initChart(symbol) {
     loadPriceInfo(symbol);
 }
 
-function setupCheckbox(id, series) {
+function setupCheckbox(id, seriesGetter) {
     var el = document.getElementById(id);
     if (el) {
-        el.addEventListener('change', function(e) { toggleSeries(series, e.target.checked); });
+        el.addEventListener('change', function(e) { toggleSeries(seriesGetter(), e.target.checked); });
     }
 }
 
@@ -117,7 +112,7 @@ function createMainChart() {
         grid: { vertLines: { color: GRID_COLOR }, horzLines: { color: GRID_COLOR } },
         crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
         rightPriceScale: { borderColor: BORDER_COLOR },
-        timeScale: { borderColor: BORDER_COLOR, timeVisible: true, secondsVisible: false },
+        timeScale: { borderColor: BORDER_COLOR, timeVisible: false, secondsVisible: false },
     });
 
     candleSeries = mainChart.addCandlestickSeries({
@@ -146,8 +141,6 @@ function createMainChart() {
     window.addEventListener('resize', function() {
         mainChart.applyOptions({ width: document.getElementById('mainChart').clientWidth });
         if (volumeChart) volumeChart.applyOptions({ width: document.getElementById('volumeChart').clientWidth });
-        if (rsiChart) rsiChart.applyOptions({ width: document.getElementById('rsiChart').clientWidth });
-        if (macdChart) macdChart.applyOptions({ width: document.getElementById('macdChart').clientWidth });
     });
 }
 
@@ -164,38 +157,13 @@ function createVolumeChart() {
     volumeChart.priceScale('').applyOptions({ scaleMargins: { top: 0.1, bottom: 0 } });
 }
 
-function createRsiChart() {
-    var container = document.getElementById('rsiChart');
-    rsiChart = LightweightCharts.createChart(container, {
-        width: container.clientWidth, height: 120,
-        layout: { background: { color: CHART_BG }, textColor: TEXT_COLOR },
-        grid: { vertLines: { color: GRID_COLOR }, horzLines: { color: GRID_COLOR } },
-        rightPriceScale: { borderColor: BORDER_COLOR, scaleMargins: { top: 0.1, bottom: 0.1 } },
-        timeScale: { borderColor: BORDER_COLOR, visible: false },
-    });
-    rsiSeries = rsiChart.addLineSeries({ color: '#e91e63', lineWidth: 1, priceLineVisible: false });
-}
-
-function createMacdChart() {
-    var container = document.getElementById('macdChart');
-    macdChart = LightweightCharts.createChart(container, {
-        width: container.clientWidth, height: 120,
-        layout: { background: { color: CHART_BG }, textColor: TEXT_COLOR },
-        grid: { vertLines: { color: GRID_COLOR }, horzLines: { color: GRID_COLOR } },
-        rightPriceScale: { borderColor: BORDER_COLOR },
-        timeScale: { borderColor: BORDER_COLOR, visible: false },
-    });
-    macdLineSeries = macdChart.addLineSeries({ color: '#2196f3', lineWidth: 1, priceLineVisible: false });
-    macdSigSeries  = macdChart.addLineSeries({ color: '#ff9800', lineWidth: 1, priceLineVisible: false });
-    macdHistSeries = macdChart.addHistogramSeries({ priceLineVisible: false });
-}
-
 // ── 데이터 로드 ──
 
 async function loadChartData(symbol) {
     showLoading(true);
     try {
-        var res = await fetch('/api/stock/' + symbol + '/candle');
+        var tfParam = currentTimeframe !== 'day' ? '?timeframe=' + currentTimeframe : '';
+        var res = await fetch('/api/stock/' + symbol + '/candle' + tfParam);
         if (!res.ok) throw new Error('HTTP ' + res.status);
         currentData = await res.json();
 
@@ -203,13 +171,20 @@ async function loadChartData(symbol) {
         renderVolume(currentData);
         renderOverlays(currentData);
 
-        if (document.getElementById('chkRSI').checked) renderRsi(currentData);
-        if (document.getElementById('chkMACD').checked) renderMacd(currentData);
-
         var count = (currentData.candles || []).length;
-        document.getElementById('infoCandleCount').textContent = '캔들 ' + count + '개 (최대 3년)';
+        var isIntraday = currentTimeframe !== 'day';
+        document.getElementById('infoCandleCount').textContent =
+            '캔들 ' + count + '개' + (isIntraday ? '' : ' (최대 3년)');
 
-        applyVisibleRange();
+        mainChart.applyOptions({
+            timeScale: { timeVisible: isIntraday, secondsVisible: false }
+        });
+
+        if (isIntraday) {
+            mainChart.timeScale().fitContent();
+        } else {
+            applyVisibleRange();
+        }
         syncTimeScales();
         updateMAValues();
         analyzeMA();
@@ -254,20 +229,6 @@ function renderOverlays(data) {
     setLineData(bbLowerSeries, data.bollingerLower, data.candles);
 }
 
-function renderRsi(data) { setLineData(rsiSeries, data.rsi, data.candles); }
-
-function renderMacd(data) {
-    setLineData(macdLineSeries, data.macdLine, data.candles);
-    setLineData(macdSigSeries, data.macdSignal, data.candles);
-    var histData = (data.macdHistogram || [])
-        .map(function(v, i) {
-            if (v == null) return null;
-            return { time: dateToTimestamp(data.candles[i].date), value: v,
-                     color: v >= 0 ? 'rgba(239,83,80,0.7)' : 'rgba(66,165,245,0.7)' };
-        }).filter(Boolean);
-    macdHistSeries.setData(histData);
-}
-
 function setLineData(series, values, candles) {
     if (!series || !values || !candles) return;
     var data = [];
@@ -296,8 +257,6 @@ function syncTimeScales() {
     mainChart.timeScale().subscribeVisibleLogicalRangeChange(function(range) {
         if (!range) return;
         if (volumeChart) volumeChart.timeScale().setVisibleLogicalRange(range);
-        if (rsiChart) rsiChart.timeScale().setVisibleLogicalRange(range);
-        if (macdChart) macdChart.timeScale().setVisibleLogicalRange(range);
     });
 }
 
@@ -402,7 +361,6 @@ function analyzeMA() {
 
     var signals = [];
 
-    // 가격 vs MA 위치 분석
     if (ma50Val != null) {
         if (price > ma50Val) signals.push({ type: 'bullish', text: '현재가가 MA50(' + formatNumber(ma50Val) + ') 위에 위치 — 단기 상승 추세' });
         else signals.push({ type: 'bearish', text: '현재가가 MA50(' + formatNumber(ma50Val) + ') 아래 위치 — 단기 하락 추세' });
@@ -412,7 +370,6 @@ function analyzeMA() {
         else signals.push({ type: 'bearish', text: '현재가가 MA200(' + formatNumber(ma200Val) + ') 아래 위치 — 장기 하락 추세' });
     }
 
-    // 골든크로스 / 데드크로스 확인 (최근 5일)
     if (ma50Val != null && ma200Val != null && last >= 5) {
         for (var i = last - 4; i <= last; i++) {
             var prev50 = currentData.ma50[i - 1];
@@ -430,7 +387,6 @@ function analyzeMA() {
         }
     }
 
-    // MA 배열 분석
     if (ma50Val != null && ma100Val != null && ma200Val != null) {
         if (ma50Val > ma100Val && ma100Val > ma200Val) {
             signals.push({ type: 'bullish', text: 'MA 정배열 (MA50 > MA100 > MA200) — 상승 추세 지속 가능' });
@@ -465,7 +421,7 @@ function analyzeTradingSignal() {
     var content = document.getElementById('tradingAnalysisContent');
     var verdictEl = document.getElementById('tradingVerdict');
     if (!currentData || !currentData.candles || currentData.candles.length < 30) {
-        content.innerHTML = '<div class="text-secondary small">분석에 필요한 데이터가 부족합니다 (최소 30일 필요).</div>';
+        content.innerHTML = '<div class="text-secondary small">분석에 필요한 데이터가 부족합니다 (최소 30개 캔들 필요).</div>';
         verdictEl.textContent = '';
         return;
     }
@@ -475,7 +431,6 @@ function analyzeTradingSignal() {
     var prevPrice = currentData.candles[last - 1].close;
     var volume = currentData.candles[last].volume;
 
-    // 최근 20일 평균 거래량
     var volSum = 0;
     var volCount = Math.min(20, last);
     for (var vi = last - volCount; vi < last; vi++) {
@@ -483,13 +438,10 @@ function analyzeTradingSignal() {
     }
     var avgVolume = volSum / volCount;
 
-    var scores = []; // { name, score(-2~+2), reason }
+    var scores = [];
 
     // 1) MA 배열 분석
-    var ma5Val = safeVal(currentData.ma5, last);
-    var ma20Val = safeVal(currentData.ma20, last);
     var ma50Val = safeVal(currentData.ma50, last);
-    var ma100Val = safeVal(currentData.ma100, last);
     var ma200Val = safeVal(currentData.ma200, last);
 
     if (ma50Val && ma200Val) {
@@ -504,7 +456,7 @@ function analyzeTradingSignal() {
         }
     }
 
-    // 2) 골든크로스 / 데드크로스 (최근 10일)
+    // 2) 골든크로스 / 데드크로스 (최근 10캔들)
     if (ma50Val && ma200Val && last >= 10) {
         var crossFound = false;
         for (var ci = last - 9; ci <= last; ci++) {
@@ -524,62 +476,25 @@ function analyzeTradingSignal() {
             }
         }
         if (!crossFound) {
-            scores.push({ name: '크로스', score: 0, reason: '최근 10일 내 크로스 시그널 없음' });
+            scores.push({ name: '크로스', score: 0, reason: '최근 크로스 시그널 없음' });
         }
     }
 
-    // 3) RSI 분석
-    var rsiVal = safeVal(currentData.rsi, last);
-    if (rsiVal) {
-        if (rsiVal >= 70) {
-            scores.push({ name: 'RSI(' + rsiVal.toFixed(1) + ')', score: -2, reason: '과매수 구간 (70 이상) — 단기 조정 가능성' });
-        } else if (rsiVal >= 60) {
-            scores.push({ name: 'RSI(' + rsiVal.toFixed(1) + ')', score: 1, reason: '매수 우위 구간 (60~70) — 상승 모멘텀 유지' });
-        } else if (rsiVal <= 30) {
-            scores.push({ name: 'RSI(' + rsiVal.toFixed(1) + ')', score: 2, reason: '과매도 구간 (30 이하) — 반등 가능성' });
-        } else if (rsiVal <= 40) {
-            scores.push({ name: 'RSI(' + rsiVal.toFixed(1) + ')', score: -1, reason: '매도 우위 구간 (30~40) — 하락 모멘텀' });
-        } else {
-            scores.push({ name: 'RSI(' + rsiVal.toFixed(1) + ')', score: 0, reason: '중립 구간 (40~60)' });
-        }
-    }
-
-    // 4) MACD 분석
-    var macdVal = safeVal(currentData.macdLine, last);
-    var macdSig = safeVal(currentData.macdSignal, last);
-    var macdHist = safeVal(currentData.macdHistogram, last);
-    var prevHist = safeVal(currentData.macdHistogram, last - 1);
-    if (macdVal != null && macdSig != null) {
-        if (macdVal > macdSig && macdHist > 0) {
-            var rising = prevHist != null && macdHist > prevHist;
-            scores.push({ name: 'MACD', score: rising ? 2 : 1, reason: 'MACD가 시그널 위 (매수 신호)' + (rising ? ' + 히스토그램 확대 중' : '') });
-        } else if (macdVal < macdSig && macdHist < 0) {
-            var falling = prevHist != null && macdHist < prevHist;
-            scores.push({ name: 'MACD', score: falling ? -2 : -1, reason: 'MACD가 시그널 아래 (매도 신호)' + (falling ? ' + 히스토그램 확대 중' : '') });
-        } else {
-            scores.push({ name: 'MACD', score: 0, reason: 'MACD와 시그널이 수렴 중 (방향 탐색)' });
-        }
-    }
-
-    // 5) 볼린저 밴드 분석
+    // 3) 볼린저 밴드 분석
     var bbUpper = safeVal(currentData.bollingerUpper, last);
     var bbLower = safeVal(currentData.bollingerLower, last);
-    var bbMiddle = safeVal(currentData.bollingerMiddle, last);
-    if (bbUpper && bbLower && bbMiddle) {
-        var bbWidth = bbUpper - bbLower;
-        var bbPos = (price - bbLower) / bbWidth; // 0~1 범위
+    if (bbUpper && bbLower) {
         if (price >= bbUpper) {
-            scores.push({ name: '볼린저', score: -1, reason: '상단 밴드 도달/돌파 (' + formatNumber(bbUpper) + ') — 과열 주의' });
+            scores.push({ name: '볼린저', score: -1, reason: '상단 밴드 도달/돌파 — 과열 주의' });
         } else if (price <= bbLower) {
-            scores.push({ name: '볼린저', score: 1, reason: '하단 밴드 도달/돌파 (' + formatNumber(bbLower) + ') — 반등 가능' });
-        } else if (bbPos > 0.5) {
-            scores.push({ name: '볼린저', score: 0, reason: '밴드 상단부 위치 (중심선 위)' });
+            scores.push({ name: '볼린저', score: 1, reason: '하단 밴드 도달/돌파 — 반등 가능' });
         } else {
-            scores.push({ name: '볼린저', score: 0, reason: '밴드 하단부 위치 (중심선 아래)' });
+            var bbPos = (price - bbLower) / (bbUpper - bbLower);
+            scores.push({ name: '볼린저', score: 0, reason: '밴드 ' + (bbPos > 0.5 ? '상단부' : '하단부') + ' 위치' });
         }
     }
 
-    // 6) 거래량 분석
+    // 4) 거래량 분석
     if (avgVolume > 0) {
         var volRatio = volume / avgVolume;
         if (volRatio >= 2.0 && price > prevPrice) {
@@ -593,20 +508,20 @@ function analyzeTradingSignal() {
         }
     }
 
-    // 7) 단기 모멘텀 (5일 수익률)
+    // 5) 단기 모멘텀 (5캔들 수익률)
     if (last >= 5) {
         var price5ago = currentData.candles[last - 5].close;
         var momentum5 = ((price - price5ago) / price5ago * 100).toFixed(2);
         if (momentum5 > 5) {
-            scores.push({ name: '5일 모멘텀', score: 1, reason: '5일간 +' + momentum5 + '% 상승 — 단기 강세' });
+            scores.push({ name: '단기 모멘텀', score: 1, reason: '최근 5캔들 +' + momentum5 + '% 상승 — 단기 강세' });
         } else if (momentum5 < -5) {
-            scores.push({ name: '5일 모멘텀', score: -1, reason: '5일간 ' + momentum5 + '% 하락 — 단기 약세' });
+            scores.push({ name: '단기 모멘텀', score: -1, reason: '최근 5캔들 ' + momentum5 + '% 하락 — 단기 약세' });
         } else {
-            scores.push({ name: '5일 모멘텀', score: 0, reason: '5일간 ' + (momentum5 > 0 ? '+' : '') + momentum5 + '% — 횡보' });
+            scores.push({ name: '단기 모멘텀', score: 0, reason: '최근 5캔들 ' + (momentum5 > 0 ? '+' : '') + momentum5 + '% — 횡보' });
         }
     }
 
-    // 종합 점수 계산
+    // 종합 점수
     var totalScore = 0;
     var maxScore = 0;
     scores.forEach(function(s) {
@@ -614,7 +529,6 @@ function analyzeTradingSignal() {
         maxScore += 2;
     });
 
-    // 판정
     var verdict, verdictClass, verdictBg;
     if (totalScore >= 5) {
         verdict = '강력 매수'; verdictClass = 'text-white'; verdictBg = 'bg-danger';
@@ -635,8 +549,7 @@ function analyzeTradingSignal() {
     verdictEl.className = 'badge fs-6 ' + verdictBg + ' ' + verdictClass;
     verdictEl.textContent = verdict + ' (' + (totalScore > 0 ? '+' : '') + totalScore + '/' + maxScore + ')';
 
-    // HTML 렌더링
-    var html = '<div class="mb-3 small text-secondary">MA, RSI, MACD, 볼린저밴드, 거래량, 모멘텀을 종합 분석한 결과입니다.</div>';
+    var html = '<div class="mb-3 small text-secondary">MA, 볼린저밴드, 거래량, 모멘텀을 종합 분석한 결과입니다.</div>';
 
     html += '<table class="table table-dark table-sm mb-3" style="font-size:0.82rem">';
     html += '<thead><tr class="text-secondary"><th>지표</th><th>신호</th><th>근거</th></tr></thead><tbody>';
@@ -654,22 +567,20 @@ function analyzeTradingSignal() {
     });
     html += '</tbody></table>';
 
-    // 종합 코멘트
     html += '<div class="p-3 rounded" style="background:#1a1e2e;border:1px solid #2a2e39">';
     html += '<div class="fw-bold mb-2" style="color:#ffc107"><i class="bi bi-chat-left-text me-1"></i>종합 코멘트</div>';
     html += '<div class="small text-light" style="line-height:1.7">';
-    html += generateComment(scores, totalScore, price, ma50Val, ma200Val, rsiVal, verdict);
+    html += generateComment(scores, totalScore, price, ma50Val, ma200Val, verdict);
     html += '</div></div>';
 
-    html += '<div class="mt-2 text-secondary" style="font-size:0.7rem">* 본 분석은 기술적 지표 기반의 참고 자료이며 투자 권유가 아닙니다. 투자 판단은 본인 책임입니다.</div>';
+    html += '<div class="mt-2 text-secondary" style="font-size:0.7rem">* 본 분석은 기술적 지표 기반의 참고 자료이며 투자 권유가 아닙니다.</div>';
 
     content.innerHTML = html;
 }
 
-function generateComment(scores, totalScore, price, ma50Val, ma200Val, rsiVal, verdict) {
+function generateComment(scores, totalScore, price, ma50Val, ma200Val, verdict) {
     var lines = [];
 
-    // 추세 판단
     if (ma50Val && ma200Val) {
         if (ma50Val > ma200Val) {
             lines.push('현재 이동평균선이 <strong style="color:#ef5350">정배열</strong> 상태로 중장기 상승 추세가 유지되고 있습니다.');
@@ -678,36 +589,11 @@ function generateComment(scores, totalScore, price, ma50Val, ma200Val, rsiVal, v
         }
     }
 
-    // RSI 코멘트
-    if (rsiVal) {
-        if (rsiVal >= 70) {
-            lines.push('RSI ' + rsiVal.toFixed(1) + '으로 <strong style="color:#ef5350">과매수</strong> 영역에 진입해 있어, 단기 차익 실현 매물이 나올 수 있는 구간입니다.');
-        } else if (rsiVal <= 30) {
-            lines.push('RSI ' + rsiVal.toFixed(1) + '으로 <strong style="color:#42a5f5">과매도</strong> 영역에 있어, 기술적 반등이 기대되는 구간입니다.');
-        } else if (rsiVal >= 50) {
-            lines.push('RSI ' + rsiVal.toFixed(1) + '으로 매수 우위 구간에서 움직이고 있습니다.');
-        } else {
-            lines.push('RSI ' + rsiVal.toFixed(1) + '으로 매도 우위 구간에서 움직이고 있습니다.');
-        }
-    }
-
-    // MACD 코멘트
-    var macdScore = scores.find(function(s) { return s.name === 'MACD'; });
-    if (macdScore) {
-        if (macdScore.score >= 1) {
-            lines.push('MACD에서 매수 시그널이 확인되며, 상승 모멘텀이 형성 중입니다.');
-        } else if (macdScore.score <= -1) {
-            lines.push('MACD에서 매도 시그널이 나타나고 있어, 하락 모멘텀에 주의가 필요합니다.');
-        }
-    }
-
-    // 거래량 코멘트
     var volScore = scores.find(function(s) { return s.name === '거래량'; });
     if (volScore && Math.abs(volScore.score) >= 2) {
         lines.push('특히 <strong>거래량이 평소 대비 크게 증가</strong>하여 시장 참여자들의 관심이 집중되고 있습니다.');
     }
 
-    // 크로스 코멘트
     var crossScore = scores.find(function(s) { return s.name === '크로스'; });
     if (crossScore && crossScore.score === 2) {
         lines.push('<strong style="color:#ffc107">골든크로스</strong>가 최근 발생하여 중기적 매수 신호가 강화되고 있습니다.');
@@ -715,22 +601,21 @@ function generateComment(scores, totalScore, price, ma50Val, ma200Val, rsiVal, v
         lines.push('<strong style="color:#ef5350">데드크로스</strong>가 최근 발생하여 중기적 매도 압력이 강화되고 있습니다.');
     }
 
-    // 종합 판단
     lines.push('');
     if (totalScore >= 5) {
-        lines.push('종합적으로 <strong style="color:#ef5350">다수의 지표가 매수를 가리키고 있으며</strong>, 추세와 모멘텀이 모두 우호적인 상황입니다. 다만, 급등 후에는 단기 조정 가능성도 열어두어야 합니다.');
+        lines.push('종합적으로 <strong style="color:#ef5350">다수의 지표가 매수를 가리키고 있습니다</strong>. 다만, 급등 후에는 단기 조정 가능성도 열어두어야 합니다.');
     } else if (totalScore >= 3) {
-        lines.push('종합적으로 <strong style="color:#ef5350">매수 우위</strong> 판단입니다. 추세 방향이 긍정적이나, 지지선 확인 후 진입하는 것이 안전합니다.');
+        lines.push('종합적으로 <strong style="color:#ef5350">매수 우위</strong> 판단입니다. 지지선 확인 후 진입하는 것이 안전합니다.');
     } else if (totalScore >= 1) {
-        lines.push('전반적으로 매수 쪽에 약간 기울어 있으나, 확실한 시그널이 부족합니다. <strong>추가 확인 후 소량 분할 매수</strong>를 고려해 볼 수 있습니다.');
+        lines.push('매수 쪽에 약간 기울어 있으나, 확실한 시그널이 부족합니다. <strong>소량 분할 매수</strong>를 고려해 볼 수 있습니다.');
     } else if (totalScore <= -5) {
-        lines.push('종합적으로 <strong style="color:#42a5f5">다수의 지표가 매도를 가리키고 있으며</strong>, 하락 추세가 강한 상황입니다. 보유 중이라면 손절 또는 비중 축소를 검토할 필요가 있습니다.');
+        lines.push('종합적으로 <strong style="color:#42a5f5">다수의 지표가 매도를 가리키고 있습니다</strong>. 보유 중이라면 손절 또는 비중 축소를 검토하세요.');
     } else if (totalScore <= -3) {
-        lines.push('종합적으로 <strong style="color:#42a5f5">매도 우위</strong> 판단입니다. 추세 반전 신호가 나올 때까지 신규 매수는 자제하는 것이 바람직합니다.');
+        lines.push('종합적으로 <strong style="color:#42a5f5">매도 우위</strong> 판단입니다. 추세 반전 신호가 나올 때까지 신규 매수는 자제하세요.');
     } else if (totalScore <= -1) {
-        lines.push('전반적으로 매도 쪽에 약간 기울어 있습니다. <strong>추세 전환 시그널을 확인할 때까지 관망</strong>이 적절합니다.');
+        lines.push('매도 쪽에 약간 기울어 있습니다. <strong>추세 전환 시그널을 확인할 때까지 관망</strong>이 적절합니다.');
     } else {
-        lines.push('현재 매수/매도 시그널이 혼재되어 <strong>뚜렷한 방향성이 없는 상태</strong>입니다. 확실한 추세가 형성될 때까지 관망하는 것을 권장합니다.');
+        lines.push('매수/매도 시그널이 혼재되어 <strong>뚜렷한 방향성이 없는 상태</strong>입니다. 확실한 추세가 형성될 때까지 관망을 권장합니다.');
     }
 
     return lines.join('<br>');
@@ -788,6 +673,12 @@ function dateToTimestamp(dateStr) {
     var y = parseInt(dateStr.slice(0, 4), 10);
     var m = parseInt(dateStr.slice(4, 6), 10) - 1;
     var d = parseInt(dateStr.slice(6, 8), 10);
+    if (dateStr.length >= 12) {
+        var hh = parseInt(dateStr.slice(8, 10), 10);
+        var mm = parseInt(dateStr.slice(10, 12), 10);
+        var ss = dateStr.length >= 14 ? parseInt(dateStr.slice(12, 14), 10) : 0;
+        return Date.UTC(y, m, d, hh - 9, mm, ss) / 1000;
+    }
     return Date.UTC(y, m, d) / 1000;
 }
 

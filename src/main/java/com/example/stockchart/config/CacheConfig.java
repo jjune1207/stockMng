@@ -36,6 +36,13 @@ public class CacheConfig {
                 .maximumSize(200)
                 .build());
 
+        // 분봉 캔들 데이터 캐시: 1분 TTL (장중 실시간성)
+        cacheManager.registerCustomCache("stockMinuteCandle",
+            Caffeine.newBuilder()
+                .expireAfterWrite(1, TimeUnit.MINUTES)
+                .maximumSize(100)
+                .build());
+
         // 종목 검색 캐시: 60분 TTL
         cacheManager.registerCustomCache("stockSearch",
             Caffeine.newBuilder()

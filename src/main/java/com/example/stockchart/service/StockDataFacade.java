@@ -29,6 +29,10 @@ public class StockDataFacade {
         return naverStockService.getDailyCandles(symbol);
     }
 
+    public List<CandleDto> getMinuteCandles(String symbol, int intervalMinutes) {
+        return naverStockService.getMinuteCandles(symbol, intervalMinutes);
+    }
+
     public List<StockSearchDto> searchStock(String keyword) {
         return naverStockService.searchStock(keyword);
     }

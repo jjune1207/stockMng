@@ -36,6 +36,15 @@ public interface NaverStockService {
     List<StockSearchDto> searchStock(String keyword);
 
     /**
+     * 분봉 캔들 데이터 조회 (네이버 모바일 API)
+     *
+     * @param symbol 종목/ETF 코드
+     * @param intervalMinutes 분 단위 (1, 3, 10)
+     * @return OHLCV 캔들 리스트 (시간 오름차순)
+     */
+    List<CandleDto> getMinuteCandles(String symbol, int intervalMinutes);
+
+    /**
      * 당일 거래량 상위 종목/ETF 목록 조회
      *
      * @param type stock 또는 etf

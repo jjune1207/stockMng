@@ -109,6 +109,122 @@ public class NaverStockServiceImpl implements NaverStockService {
     }
 
     @Override
+    @Cacheable(value = "stockMinuteCandle", key = "#p0 + '_' + #p1")
+    public List<CandleDto> getMinuteCandles(String symbol, int intervalMinutes) {
+        log.info("분봉 캔들 데이터 조회 시작: symbol={}, interval={}분", symbol, intervalMinutes);
+
+        // 최근 5일치 데이터를 가져오기 위해 startDateTime 설정
+        String startDateTime = LocalDate.now().minusDays(5).format(DATE_FMT) + "090000";
+
+        try {
+            String rawResponse = naverWebClient.get()
+                .uri(uriBuilder -> uriBuilder
+                    .scheme("https")
+                    .host("api.stock.naver.com")
+                    .path("/chart/domestic/item/{symbol}/minute")
+                    .queryParam("periodType", intervalMinutes)
+                    .queryParam("startDateTime", startDateTime)
+                    .build(symbol))
+                .retrieve()
+                .bodyToMono(String.class)
+                .block();
+
+            if (rawResponse == null || rawResponse.isBlank()) {
+                log.warn("분봉 캔들 응답이 비어 있습니다: symbol={}", symbol);
+                return Collections.emptyList();
+            }
+
+            JsonNode root = objectMapper.readTree(rawResponse);
+            if (!root.isArray()) {
+                return Collections.emptyList();
+            }
+
+            // 1분봉 원본 데이터 파싱
+            List<CandleDto> rawCandles = new ArrayList<>();
+            for (JsonNode node : root) {
+                String dateTime = node.path("localDateTime").asText("");
+                if (dateTime.length() < 12) continue;
+                rawCandles.add(CandleDto.builder()
+                    .date(dateTime) // yyyyMMddHHmmss 형식 유지
+                    .open(node.path("openPrice").asDouble())
+                    .high(node.path("highPrice").asDouble())
+                    .low(node.path("lowPrice").asDouble())
+                    .close(node.path("currentPrice").asDouble())
+                    .volume(node.path("accumulatedTradingVolume").asLong())
+                    .build());
+            }
+
+            // 1분봉이면 그대로 반환, 아니면 집계
+            List<CandleDto> result;
+            if (intervalMinutes <= 1) {
+                result = rawCandles;
+            } else {
+                result = aggregateMinuteCandles(rawCandles, intervalMinutes);
+            }
+
+            log.info("분봉 캔들 데이터 조회 완료: symbol={}, interval={}분, count={}",
+                symbol, intervalMinutes, result.size());
+            return result;
+
+        } catch (WebClientResponseException e) {
+            log.error("분봉 캔들 조회 HTTP 오류 [HTTP {}] symbol={}: {}",
+                e.getStatusCode(), symbol, e.getMessage());
+            throw new StockApiException(
+                "분봉 캔들 데이터 조회 실패: " + e.getMessage(), e.getStatusCode().value(), e);
+        } catch (Exception e) {
+            log.error("분봉 캔들 조회 중 예외 발생: symbol={}: {}", symbol, e.getMessage(), e);
+            throw new StockApiException("분봉 캔들 데이터 조회 오류: " + e.getMessage(), e);
+        }
+    }
+
+    /** 1분봉을 N분봉으로 집계 */
+    private List<CandleDto> aggregateMinuteCandles(List<CandleDto> oneMinCandles, int intervalMinutes) {
+        if (oneMinCandles.isEmpty()) return Collections.emptyList();
+
+        List<CandleDto> result = new ArrayList<>();
+        int i = 0;
+        while (i < oneMinCandles.size()) {
+            CandleDto first = oneMinCandles.get(i);
+            String baseDate = first.getDate().substring(0, 8); // yyyyMMdd
+            int baseHour = Integer.parseInt(first.getDate().substring(8, 10));
+            int baseMin = Integer.parseInt(first.getDate().substring(10, 12));
+            int slotStart = (baseMin / intervalMinutes) * intervalMinutes;
+
+            double open = first.getOpen();
+            double high = first.getHigh();
+            double low = first.getLow();
+            double close = first.getClose();
+            long volume = first.getVolume();
+            String slotDate = String.format("%s%02d%02d00", baseDate, baseHour, slotStart);
+
+            i++;
+            while (i < oneMinCandles.size()) {
+                CandleDto c = oneMinCandles.get(i);
+                String cDate = c.getDate().substring(0, 8);
+                int cHour = Integer.parseInt(c.getDate().substring(8, 10));
+                int cMin = Integer.parseInt(c.getDate().substring(10, 12));
+                int cSlotStart = (cMin / intervalMinutes) * intervalMinutes;
+
+                if (!cDate.equals(baseDate) || cHour != baseHour || cSlotStart != slotStart) {
+                    break;
+                }
+                high = Math.max(high, c.getHigh());
+                low = Math.min(low, c.getLow());
+                close = c.getClose();
+                volume += c.getVolume();
+                i++;
+            }
+
+            result.add(CandleDto.builder()
+                .date(slotDate)
+                .open(open).high(high).low(low).close(close)
+                .volume(volume)
+                .build());
+        }
+        return result;
+    }
+
+    @Override
     @Cacheable(value = "stockPrice", key = "#p0")
     public StockPriceDto getCurrentPrice(String symbol) {
         log.info("현재가 정보 조회 시작: symbol={}", symbol);

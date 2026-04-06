@@ -40,22 +40,39 @@ public class StockApiController {
     }
 
     @GetMapping("/{symbol}/candle")
-    public ResponseEntity<Map<String, Object>> getCandle(@PathVariable("symbol") String symbol) {
-        log.info("REST 캔들 요청: symbol={}", symbol);
+    public ResponseEntity<Map<String, Object>> getCandle(
+            @PathVariable("symbol") String symbol,
+            @RequestParam(name = "timeframe", defaultValue = "day") String timeframe) {
+        log.info("REST 캔들 요청: symbol={}, timeframe={}", symbol, timeframe);
 
-        List<CandleDto> candles = stockDataFacade.getDailyCandles(symbol);
+        List<CandleDto> candles;
+        switch (timeframe) {
+            case "1":
+                candles = stockDataFacade.getMinuteCandles(symbol, 1);
+                break;
+            case "3":
+                candles = stockDataFacade.getMinuteCandles(symbol, 3);
+                break;
+            case "10":
+                candles = stockDataFacade.getMinuteCandles(symbol, 10);
+                break;
+            default:
+                candles = stockDataFacade.getDailyCandles(symbol);
+                break;
+        }
 
+        List<Double> ma5 = IndicatorUtil.calculateMA(candles, 5);
+        List<Double> ma20 = IndicatorUtil.calculateMA(candles, 20);
         List<Double> ma50 = IndicatorUtil.calculateMA(candles, 50);
         List<Double> ma100 = IndicatorUtil.calculateMA(candles, 100);
         List<Double> ma200 = IndicatorUtil.calculateMA(candles, 200);
-        List<Double> ma5 = IndicatorUtil.calculateMA(candles, 5);
-        List<Double> ma20 = IndicatorUtil.calculateMA(candles, 20);
 
         IndicatorUtil.BollingerBands bb = IndicatorUtil.calculateBollingerBands(candles, 20, 2.0);
         List<Double> rsi = IndicatorUtil.calculateRSI(candles, 14);
         IndicatorUtil.MacdResult macd = IndicatorUtil.calculateMACD(candles, 12, 26, 9);
 
         Map<String, Object> result = new LinkedHashMap<>();
+        result.put("timeframe", timeframe);
         result.put("candles", candles);
         result.put("ma5", ma5);
         result.put("ma20", ma20);
