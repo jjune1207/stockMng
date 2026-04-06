@@ -229,8 +229,9 @@
     function applyGroupOrder(serverGroups) {
         const savedOrder = loadGroupOrder();
         if (!savedOrder) return serverGroups;
+        // localStorage에 저장된 그룹 순서를 유지하면서, 서버에만 있는 새 그룹도 추가
         const ordered = [];
-        savedOrder.forEach(g => { if (serverGroups.includes(g)) ordered.push(g); });
+        savedOrder.forEach(g => ordered.push(g));
         serverGroups.forEach(g => { if (!ordered.includes(g)) ordered.push(g); });
         return ordered;
     }
@@ -331,7 +332,8 @@
         const allBtn = document.createElement('button');
         allBtn.className = 'btn btn-sm group-filter-btn ' + (currentGroupFilter === '__all__' ? 'btn-warning' : 'btn-outline-secondary');
         allBtn.dataset.group = '__all__';
-        allBtn.textContent = '전체 (' + watchlistPriceCache.length + ')';
+        const uniqueCount = new Set(watchlistPriceCache.map(r => r.item.symbol)).size;
+        allBtn.textContent = '전체 (' + uniqueCount + ')';
         allBtn.addEventListener('click', function() {
             currentGroupFilter = '__all__';
             renderGroupFilter();
@@ -418,7 +420,15 @@
     function renderWatchlistTable() {
         const tbody = document.getElementById('watchlistTableBody');
         let filtered = watchlistPriceCache;
-        if (currentGroupFilter !== '__all__') {
+        if (currentGroupFilter === '__all__') {
+            // 전체 탭: symbol 기준 중복 제거 (첫 번째 항목만 표시)
+            const seen = new Set();
+            filtered = filtered.filter(r => {
+                if (seen.has(r.item.symbol)) return false;
+                seen.add(r.item.symbol);
+                return true;
+            });
+        } else {
             filtered = filtered.filter(r => r.item.group === currentGroupFilter);
         }
 
@@ -503,6 +513,11 @@
             opts + '</select>';
     }
 
+    function buildGroupBadges(symbol) {
+        const groups = watchlistPriceCache.filter(r => r.item.symbol === symbol).map(r => r.item.group);
+        return groups.map(g => '<span class="badge bg-outline-secondary border border-secondary me-1" style="font-size:0.7rem">' + escHtml(g) + '</span>').join('');
+    }
+
     function buildWatchlistRow(price, item) {
         const isUp = price.priceChange > 0;
         const isDown = price.priceChange < 0;
@@ -510,33 +525,49 @@
         const sign = isUp ? '+' : '';
         const icon = isUp ? '&#9650;' : (isDown ? '&#9660;' : '&#9472;');
 
+        const isAllView = currentGroupFilter === '__all__';
+        const groupCell = isAllView
+            ? '<td>' + buildGroupBadges(item.symbol) + '</td>'
+            : '<td>' + buildGroupSelect(item.symbol, item.group) + '</td>';
+        const deleteBtn = isAllView
+            ? '<button class="btn btn-sm btn-outline-danger" data-action="remove-watch" data-symbol="' + escHtml(item.symbol) + '">삭제</button>'
+            : '<button class="btn btn-sm btn-outline-danger" data-action="remove-watch" data-symbol="' + escHtml(item.symbol + '|' + item.group) + '">삭제</button>';
+
         return '<tr>' +
             '<td class="fw-semibold">' + escHtml(price.name || item.name) + '</td>' +
             '<td class="text-secondary font-monospace small">' + escHtml(item.symbol) + '</td>' +
             '<td><span class="badge ' + (item.type === 'etf' ? 'bg-info' : 'bg-secondary') + '">' +
             escHtml(item.type === 'etf' ? 'ETF' : '주식') + '</span></td>' +
-            '<td>' + buildGroupSelect(item.symbol, item.group) + '</td>' +
+            groupCell +
             '<td class="text-end fw-bold">' + formatNumber(price.currentPrice) + '원</td>' +
             '<td class="text-end ' + colorClass + '">' + sign + Number(price.changeRate || 0).toFixed(2) + '%</td>' +
             '<td class="text-end text-secondary">' + formatNumber(price.volume) + '</td>' +
             '<td class="text-center">' +
             '<a href="/chart/' + escHtml(item.symbol) + '" class="btn btn-sm btn-outline-warning me-1">차트</a>' +
-            '<button class="btn btn-sm btn-outline-danger" data-action="remove-watch" data-symbol="' + escHtml(item.symbol + '|' + item.group) + '">삭제</button>' +
+            deleteBtn +
             '</td>' +
             '</tr>';
     }
 
     function buildWatchlistErrorRow(item) {
+        const isAllView = currentGroupFilter === '__all__';
+        const groupCell = isAllView
+            ? '<td>' + buildGroupBadges(item.symbol) + '</td>'
+            : '<td>' + buildGroupSelect(item.symbol, item.group) + '</td>';
+        const deleteBtn = isAllView
+            ? '<button class="btn btn-sm btn-outline-danger" data-action="remove-watch" data-symbol="' + escHtml(item.symbol) + '">삭제</button>'
+            : '<button class="btn btn-sm btn-outline-danger" data-action="remove-watch" data-symbol="' + escHtml(item.symbol + '|' + item.group) + '">삭제</button>';
+
         return '<tr>' +
             '<td class="fw-semibold">' + escHtml(item.name || item.symbol) + '</td>' +
             '<td class="text-secondary font-monospace small">' + escHtml(item.symbol) + '</td>' +
             '<td><span class="badge ' + (item.type === 'etf' ? 'bg-info' : 'bg-secondary') + '">' +
             escHtml(item.type === 'etf' ? 'ETF' : '주식') + '</span></td>' +
-            '<td>' + buildGroupSelect(item.symbol, item.group) + '</td>' +
+            groupCell +
             '<td colspan="3" class="text-secondary text-center small">조회 실패</td>' +
             '<td class="text-center">' +
             '<a href="/chart/' + escHtml(item.symbol) + '" class="btn btn-sm btn-outline-warning me-1">차트</a>' +
-            '<button class="btn btn-sm btn-outline-danger" data-action="remove-watch" data-symbol="' + escHtml(item.symbol + '|' + item.group) + '">삭제</button>' +
+            deleteBtn +
             '</td>' +
             '</tr>';
     }
@@ -546,12 +577,6 @@
         const name = escHtml(item.name || item.symbol);
         const market = escHtml(item.market || '');
         const type = escHtml(item.type === 'etf' ? 'etf' : 'stock');
-        const exists = watchlistMap.has(item.symbol);
-
-        if (exists) {
-            return '<button class="btn btn-sm btn-outline-danger" data-action="remove-watch" data-symbol="' + symbol + '">' +
-                '관심해제</button>';
-        }
 
         return '<button class="btn btn-sm btn-outline-success" data-action="add-watch" ' +
             'data-symbol="' + symbol + '" data-name="' + name + '" data-market="' + market + '" data-type="' + type + '">' +
@@ -612,9 +637,7 @@
             const badge = item.type === 'etf'
                 ? '<span class="badge bg-info ms-1 small">ETF</span>'
                 : '<span class="badge bg-secondary ms-1 small">' + escHtml(item.market || '') + '</span>';
-            const watchBtn = watchlistMap.has(item.symbol)
-                ? '<button class="btn btn-sm btn-outline-danger" data-action="remove-watch" data-symbol="' + escHtml(item.symbol) + '">관심해제</button>'
-                : '<button class="btn btn-sm btn-outline-success" data-action="add-watch" data-symbol="' + escHtml(item.symbol) + '" data-name="' + escHtml(item.name) + '" data-market="' + escHtml(item.market || '') + '" data-type="' + escHtml(item.type === 'etf' ? 'etf' : 'stock') + '">관심추가</button>';
+            const watchBtn = '<button class="btn btn-sm btn-outline-success" data-action="add-watch" data-symbol="' + escHtml(item.symbol) + '" data-name="' + escHtml(item.name) + '" data-market="' + escHtml(item.market || '') + '" data-type="' + escHtml(item.type === 'etf' ? 'etf' : 'stock') + '">관심추가</button>';
 
             return '<div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom border-secondary">' +
                 '<a href="/chart/' + escHtml(item.symbol) + '" class="text-light text-decoration-none">' +
@@ -777,8 +800,8 @@
                 const updated = items.find(i => i.symbol === r.item.symbol && i.group === r.item.group);
                 if (updated) r.item = updated;
             });
-            const rawGroups = [...new Set(items.map(i => i.group).filter(g => g && g.trim()))].sort();
-            groupList = applyGroupOrder(rawGroups);
+            // 삭제된 그룹을 groupList에서도 제거
+            groupList = groupList.filter(g => g !== groupName);
             saveGroupOrder();
             if (currentGroupFilter === groupName) currentGroupFilter = '__all__';
             renderGroupFilter();
