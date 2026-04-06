@@ -1,0 +1,228 @@
+# 주식 분석 차트 시스템
+
+Java 17 + Spring Boot 3.2 기반 주식/ETF 분석 차트 웹앱.  
+DB 없이 네이버 증권 API를 활용하여 거래량 상위 종목 조회, 관심 종목 관리, 기술적 분석을 제공합니다.
+
+---
+
+## 주요 기능
+
+- **거래량 상위 10개** 주식/ETF 목록 (10분 단위 자동 갱신)
+- **종목 검색** (네이버 자동완성 API — 주식 + ETF 통합 검색)
+- **관심 종목 관리** (추가/삭제, JSON 파일 영속화 — 서버 재시작 후에도 유지)
+- **캔들스틱 차트** (TradingView Lightweight Charts v4, 최대 3년 일봉)
+- **기술적 지표**: MA(5/20/50/100/200), 볼린저 밴드, RSI(14), MACD(12,26,9)
+- **종합 매매 분석**: 7개 지표 종합 점수 기반 매수/매도 판정 및 코멘트
+
+---
+
+## 기술 스택
+
+| 영역 | 기술 |
+|------|------|
+| Backend | Java 17, Spring Boot 3.2.5, Gradle 8.7 |
+| HTTP Client | WebClient (Spring WebFlux) |
+| 캐시 | Caffeine Cache (인메모리) |
+| 데이터 영속화 | JSON 파일 (관심 종목: `data/watchlist.json`) |
+| Frontend | Thymeleaf, TradingView Lightweight Charts v4, Bootstrap 5 |
+| 데이터 소스 | 네이버 증권 API (시세, 검색, 거래량 랭킹) |
+
+---
+
+## 사전 요구사항
+
+- **Java 17** 이상
+- **Gradle 8.x** (또는 Gradle Wrapper 사용)
+
+```cmd
+java -version
+```
+
+---
+
+## 빌드 및 실행
+
+### Gradle Wrapper 사용 (권장)
+
+```cmd
+gradlew.bat bootRun
+```
+
+### JAR 빌드 후 실행
+
+```cmd
+gradlew.bat build
+java -jar build\libs\stock-chart-0.0.1-SNAPSHOT.jar
+```
+
+### 브라우저 접속
+
+```
+http://localhost:8080
+```
+
+---
+
+## 화면 구성
+
+### 메인 화면 (`/`)
+
+- **검색창**: 종목명 또는 코드 입력 (디바운스 자동완성, 6자리 코드 입력 시 차트 직행)
+- **주요 주식 탭**: 거래량 상위 주식 10개 (현재가, 등락률, 거래량)
+- **주요 ETF 탭**: 거래량 상위 ETF 10개
+- **관심 종목 탭**: 사용자가 추가한 종목/ETF 목록 (전일대비, 등락률, 거래량)
+- **자동 갱신**: 10분 단위 + 카운트다운 타이머 + 수동 새로고침 버튼
+- 각 종목에 **차트** / **관심추가(해제)** 버튼 제공
+
+### 차트 화면 (`/chart/{종목코드}`)
+
+- **캔들스틱 차트** + 거래량 히스토그램 (시간축 동기화)
+- **기간 탭**: 1개월 / 3개월 / 6개월(기본) / 1년 / 2년 / 전체
+- **오버레이 지표**: MA 5 / MA 20 / MA 50 / MA 100 / MA 200 / 볼린저 밴드
+- **보조 지표 패널**: RSI (14) / MACD (12, 26, 9)
+- **우측 정보 패널**: 현재가, 시가/고가/저가/종가, 거래량, MA 현재값 및 이격률
+- **종합 매매 분석 패널**: 7개 지표 종합 점수 기반 판정
+  - MA 배열 / 골든·데드 크로스 / RSI / MACD / 볼린저밴드 / 거래량 / 5일 모멘텀
+  - 강력 매수 ~ 강력 매도 7단계 판정 + 상세 코멘트
+- **이동평균선 분석 패널**: 크로스 시그널, 정배열/역배열 분석
+- **빠른 검색**: 차트 페이지 내에서 다른 종목 즉시 검색·이동
+
+---
+
+## REST API 엔드포인트
+
+| 메서드 | URL | 설명 |
+|--------|-----|------|
+| GET | `/api/stock/{symbol}/price` | 현재가 (30초 캐시) |
+| GET | `/api/stock/{symbol}/candle` | 일봉 OHLCV + 기술적 지표 (10분 캐시) |
+| GET | `/api/stock/search?keyword=삼성` | 종목/ETF 검색 (60분 캐시) |
+| GET | `/api/stock/top?type=stock&limit=10` | 거래량 상위 목록 (10분 캐시) |
+| GET | `/api/stock/watchlist` | 관심 종목 목록 조회 |
+| POST | `/api/stock/watchlist` | 관심 종목 추가 |
+| DELETE | `/api/stock/watchlist/{symbol}` | 관심 종목 삭제 |
+
+### 응답 예시 — 현재가
+
+```json
+{
+  "symbol": "005930",
+  "name": "삼성전자",
+  "currentPrice": 73400,
+  "priceChange": -200,
+  "changeRate": -0.27,
+  "volume": 10234567,
+  "high": 74200,
+  "low": 72800,
+  "open": 73600
+}
+```
+
+### 요청 예시 — 관심 종목 추가
+
+```json
+POST /api/stock/watchlist
+{
+  "symbol": "005930",
+  "name": "삼성전자",
+  "market": "코스피",
+  "type": "stock"
+}
+```
+
+---
+
+## 관심 종목 영속화
+
+- 관심 종목은 `data/watchlist.json` 파일에 자동 저장됩니다.
+- 서버 재시작 시 파일에서 자동 로드하여 복원합니다.
+- 최대 30개까지 등록 가능, 6자리 종목 코드 형식 검증 적용.
+- `data/` 디렉토리는 `.gitignore`에 포함되어 있습니다.
+
+---
+
+## 캐시 설정
+
+| 캐시 이름 | TTL | 최대 항목 | 설명 |
+|-----------|-----|-----------|------|
+| `stockPrice` | 30초 | 100 | 현재가 정보 |
+| `stockCandle` | 10분 | 200 | 일봉 캔들 데이터 |
+| `stockSearch` | 60분 | 500 | 종목 검색 결과 |
+| `topRanking` | 10분 | 20 | 거래량 상위 목록 |
+
+`application.yml`에서 변경 가능:
+```yaml
+cache:
+  candle-ttl-minutes: 10
+  price-ttl-seconds: 30
+```
+
+---
+
+## 테스트 실행
+
+```cmd
+gradlew.bat test
+```
+
+테스트 보고서: `build/reports/tests/test/index.html`
+
+---
+
+## 프로젝트 구조
+
+```
+stockMng/
+├── src/main/java/com/example/stockchart/
+│   ├── StockChartApplication.java
+│   ├── config/
+│   │   ├── WebClientConfig.java          # 네이버 API용 WebClient Bean
+│   │   └── CacheConfig.java              # Caffeine 캐시 설정
+│   ├── controller/
+│   │   ├── ChartViewController.java      # Thymeleaf 페이지 라우팅 + favicon
+│   │   └── StockApiController.java       # REST API 엔드포인트
+│   ├── service/
+│   │   ├── NaverStockService.java        # 네이버 조회 인터페이스
+│   │   ├── WatchlistService.java         # 관심 종목 인터페이스
+│   │   ├── StockDataFacade.java          # 서비스 퍼사드
+│   │   └── impl/
+│   │       ├── NaverStockServiceImpl.java    # 네이버 증권 API 구현
+│   │       └── InMemoryWatchlistService.java # 관심 종목 (JSON 파일 영속화)
+│   ├── dto/
+│   │   ├── CandleDto.java
+│   │   ├── StockPriceDto.java
+│   │   ├── StockSearchDto.java
+│   │   ├── WatchlistItemDto.java
+│   │   └── WatchlistRequestDto.java
+│   ├── exception/
+│   │   ├── StockApiException.java
+│   │   └── GlobalExceptionHandler.java
+│   └── util/
+│       └── IndicatorUtil.java            # MA / 볼린저 / RSI / MACD 계산
+├── src/main/resources/
+│   ├── templates/
+│   │   ├── index.html                    # 메인 페이지 (탭 + 검색 + 관심종목)
+│   │   └── chart.html                    # 차트 페이지 (지표 + 매매 분석)
+│   ├── static/
+│   │   ├── js/chart.js                   # TradingView 렌더링 + 종합 분석
+│   │   └── css/style.css                 # 다크 테마 스타일
+│   └── application.yml
+├── src/test/java/com/example/stockchart/
+│   ├── service/impl/InMemoryWatchlistServiceTest.java
+│   └── util/IndicatorUtilTest.java
+├── data/
+│   └── watchlist.json                    # 관심 종목 저장 파일 (자동 생성)
+├── build.gradle
+├── settings.gradle
+└── README.md
+```
+
+---
+
+## 제외 항목
+
+| 항목 | 사유 |
+|------|------|
+| DB (H2 포함) | Caffeine 캐시 + JSON 파일로 충분 |
+| 로그인/인증 | 시세 조회 전용 앱, 인증 불필요 |
+| 실거래 주문 | 시세 조회 및 분석만 제공 |
+| Docker | JAR 직접 실행으로 충분 |

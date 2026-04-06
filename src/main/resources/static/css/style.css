@@ -1,0 +1,154 @@
+/* ──────────────────────────────────────────
+   공통 스타일
+────────────────────────────────────────── */
+body {
+    font-family: 'Pretendard', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
+    min-height: 100vh;
+}
+
+/* 테이블 */
+.table-dark th {
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+}
+
+/* 다크 테마 탭 */
+.nav-tabs {
+    border-bottom-color: #495057 !important;
+}
+
+.nav-tabs .nav-link {
+    color: #adb5bd !important;
+    border-color: transparent !important;
+}
+
+.nav-tabs .nav-link:hover {
+    color: #f8f9fa !important;
+    border-color: #495057 #495057 transparent !important;
+    background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+.nav-tabs .nav-link.active {
+    color: #ffc107 !important;
+    background-color: #212529 !important;
+    border-color: #495057 #495057 #212529 !important;
+}
+
+/* 그룹 필터 버튼 */
+.group-filter-btn {
+    font-size: 0.78rem !important;
+    padding: 2px 10px !important;
+    transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.group-filter-btn.drag-over {
+    box-shadow: 0 0 0 2px #ffc107 !important;
+    transform: scale(1.05);
+}
+
+.group-filter-btn[draggable="true"]:active {
+    cursor: grabbing;
+}
+
+.group-delete-btn {
+    font-size: 0.65rem;
+    opacity: 0.6;
+    cursor: pointer;
+}
+
+.group-delete-btn:hover {
+    opacity: 1;
+    color: #ef5350 !important;
+}
+
+/* 정렬 가능 헤더 */
+.sortable-th:hover {
+    color: #ffc107 !important;
+}
+
+/* 검색 결과 hover */
+.search-item:hover {
+    background-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* ──────────────────────────────────────────
+   차트 페이지
+────────────────────────────────────────── */
+#chartContainer {
+    background-color: #131722;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+#mainChart {
+    width: 100%;
+    height: 480px;
+}
+
+#volumeChart {
+    width: 100%;
+    height: 100px;
+}
+
+#rsiChart {
+    width: 100%;
+    height: 120px;
+}
+
+#macdChart {
+    width: 100%;
+    height: 120px;
+}
+
+/* 기간 탭 버튼 */
+.period-btn {
+    min-width: 48px;
+    font-size: 0.8rem;
+    padding: 4px 10px;
+}
+
+/* 지표 패널 */
+.indicator-panel {
+    background: #1e222d;
+    border-radius: 4px;
+    padding: 12px;
+}
+
+/* 정보 패널 */
+.info-value {
+    font-size: 1.1rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.info-label {
+    font-size: 0.72rem;
+    color: #6c757d;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.price-up   { color: #ef5350; }
+.price-down { color: #42a5f5; }
+.price-flat { color: #e0e0e0; }
+
+/* 차트 분리선 */
+.chart-divider {
+    height: 1px;
+    background: #2a2e39;
+    margin: 0;
+}
+
+/* 로딩 오버레이 */
+#chartLoading {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(19, 23, 34, 0.85);
+    z-index: 10;
+    border-radius: 4px;
+}

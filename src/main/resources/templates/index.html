@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${pageTitle}">주식 분석 차트</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<body class="bg-dark text-light">
+
+<nav class="navbar navbar-dark bg-black border-bottom border-secondary px-4">
+    <a class="navbar-brand fw-bold" href="/">
+        <i class="bi bi-bar-chart-fill text-warning me-2"></i>주식 분석 차트
+    </a>
+    <div class="d-flex align-items-center gap-3">
+        <small class="text-secondary">네이버 증권 API 기반 | 거래량 상위 10개 + 관심 종목</small>
+        <small class="text-secondary" id="nextRefresh"></small>
+        <button class="btn btn-sm btn-outline-secondary" onclick="refreshAll()" title="지금 새로고침">
+            <i class="bi bi-arrow-clockwise"></i>
+        </button>
+    </div>
+</nav>
+
+<div class="container-fluid px-4 py-4">
+    <div class="row mb-4">
+        <div class="col-lg-6 col-md-8 position-relative">
+            <div class="input-group input-group-lg">
+                <span class="input-group-text bg-secondary border-secondary text-light">
+                    <i class="bi bi-search"></i>
+                </span>
+                <input
+                    type="text"
+                    id="searchInput"
+                    class="form-control bg-dark text-light border-secondary"
+                    placeholder="종목명 또는 코드 검색 (예: 삼성전자, KODEX, 005930)"
+                    autocomplete="off"
+                >
+                <button class="btn btn-warning" onclick="doSearch()">검색</button>
+            </div>
+            <div
+                id="searchResults"
+                class="position-absolute bg-dark border border-secondary rounded mt-1"
+                style="z-index: 1000; display: none; max-height: 400px; overflow-y: auto; left: 12px; right: 12px;"
+            ></div>
+            <div class="mt-2">
+                <small class="text-secondary">코드를 직접 입력 후 Enter를 누르면 차트로 이동합니다.</small>
+            </div>
+        </div>
+    </div>
+
+    <ul class="nav nav-tabs border-secondary mb-3" id="stockTab" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button
+                class="nav-link active"
+                id="stock-tab"
+                data-bs-toggle="tab"
+                data-bs-target="#stockPanel"
+                type="button"
+                role="tab"
+            >
+                <i class="bi bi-graph-up me-1"></i>주요 주식 (거래량 상위)
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button
+                class="nav-link"
+                id="etf-tab"
+                data-bs-toggle="tab"
+                data-bs-target="#etfPanel"
+                type="button"
+                role="tab"
+            >
+                <i class="bi bi-collection me-1"></i>주요 ETF (거래량 상위)
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button
+                class="nav-link"
+                id="watchlist-tab"
+                data-bs-toggle="tab"
+                data-bs-target="#watchlistPanel"
+                type="button"
+                role="tab"
+            >
+                <i class="bi bi-bookmark-star me-1"></i>관심 종목
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content">
+        <div class="tab-pane fade show active" id="stockPanel" role="tabpanel">
+            <div class="card bg-dark border-secondary">
+                <div class="card-header border-secondary d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-list-ul me-2 text-warning"></i>거래량 상위 주식 10개</h5>
+                    <small class="text-secondary" id="stockUpdated"></small>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-dark table-hover mb-0">
+                            <thead>
+                            <tr class="text-secondary border-secondary">
+                                <th>종목명</th>
+                                <th>코드</th>
+                                <th class="text-end">현재가</th>
+                                <th class="text-end">전일대비</th>
+                                <th class="text-end">등락률</th>
+                                <th class="text-end">거래량</th>
+                                <th class="text-center">동작</th>
+                            </tr>
+                            </thead>
+                            <tbody id="stockTableBody">
+                            <tr>
+                                <td colspan="7" class="text-center py-4">
+                                    <div class="spinner-border spinner-border-sm text-warning me-2"></div>불러오는 중...
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="etfPanel" role="tabpanel">
+            <div class="card bg-dark border-secondary">
+                <div class="card-header border-secondary d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-collection me-2 text-info"></i>거래량 상위 ETF 10개</h5>
+                    <small class="text-secondary" id="etfUpdated"></small>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-dark table-hover mb-0">
+                            <thead>
+                            <tr class="text-secondary border-secondary">
+                                <th>ETF명</th>
+                                <th>코드</th>
+                                <th class="text-end">현재가</th>
+                                <th class="text-end">전일대비</th>
+                                <th class="text-end">등락률</th>
+                                <th class="text-end">거래량</th>
+                                <th class="text-center">동작</th>
+                            </tr>
+                            </thead>
+                            <tbody id="etfTableBody">
+                            <tr>
+                                <td colspan="7" class="text-center py-4">
+                                    <div class="spinner-border spinner-border-sm text-info me-2"></div>불러오는 중...
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="watchlistPanel" role="tabpanel">
+            <div class="card bg-dark border-secondary">
+                <div class="card-header border-secondary">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h5 class="mb-0"><i class="bi bi-bookmark-star me-2 text-success"></i>내 관심 종목 / ETF</h5>
+                        <div class="d-flex align-items-center gap-2">
+                            <small class="text-secondary" id="watchlistUpdated"></small>
+                            <button class="btn btn-sm btn-outline-success" onclick="promptAddGroup()" title="그룹 추가">
+                                <i class="bi bi-folder-plus"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="d-flex flex-wrap gap-1" id="groupFilter">
+                        <button class="btn btn-sm btn-warning group-filter-btn active" data-group="__all__">전체</button>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-dark table-hover mb-0">
+                            <thead>
+                            <tr class="text-secondary border-secondary">
+                                <th class="sortable-th" data-sort="name" style="cursor:pointer">이름 <i class="bi bi-arrow-down-up small"></i></th>
+                                <th>코드</th>
+                                <th>구분</th>
+                                <th>그룹</th>
+                                <th class="text-end sortable-th" data-sort="price" style="cursor:pointer">현재가 <i class="bi bi-arrow-down-up small"></i></th>
+                                <th class="text-end sortable-th" data-sort="changeRate" style="cursor:pointer">등락률 <i class="bi bi-arrow-down-up small"></i></th>
+                                <th class="text-end sortable-th" data-sort="volume" style="cursor:pointer">거래량 <i class="bi bi-arrow-down-up small"></i></th>
+                                <th class="text-center">동작</th>
+                            </tr>
+                            </thead>
+                            <tbody id="watchlistTableBody">
+                            <tr>
+                                <td colspan="8" class="text-center py-4 text-secondary">
+                                    관심 종목이 없습니다. 검색 결과에서 추가해 주세요.
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    const searchResultsEl = document.getElementById('searchResults');
+    const searchInputEl = document.getElementById('searchInput');
+    const watchlistMap = new Map();
+    let searchDebounceTimer = null;
+    let watchlistPriceCache = []; // {item, price} 배열
+    let currentGroupFilter = '__all__';
+    let currentSort = { key: 'name', asc: true };
+    let groupList = [];
+    let groupSelectorTarget = null; // 관심추가 시 그룹 선택 대상
+    let dragSrcGroup = null;
+
+    function loadGroupOrder() {
+        try {
+            const saved = localStorage.getItem('watchlistGroupOrder');
+            return saved ? JSON.parse(saved) : null;
+        } catch (e) { return null; }
+    }
+
+    function saveGroupOrder() {
+        localStorage.setItem('watchlistGroupOrder', JSON.stringify(groupList));
+    }
+
+    function applyGroupOrder(serverGroups) {
+        const savedOrder = loadGroupOrder();
+        if (!savedOrder) return serverGroups;
+        const ordered = [];
+        savedOrder.forEach(g => { if (serverGroups.includes(g)) ordered.push(g); });
+        serverGroups.forEach(g => { if (!ordered.includes(g)) ordered.push(g); });
+        return ordered;
+    }
+
+    async function fetchPrice(symbol) {
+        const res = await fetch('/api/stock/' + encodeURIComponent(symbol) + '/price');
+        if (!res.ok) {
+            throw new Error('현재가 조회 실패');
+        }
+        return res.json();
+    }
+
+    async function fetchTopList(type) {
+        const res = await fetch('/api/stock/top?type=' + encodeURIComponent(type) + '&limit=10');
+        if (!res.ok) {
+            throw new Error('상위 목록 조회 실패');
+        }
+        return res.json();
+    }
+
+    async function fetchWatchlist() {
+        const res = await fetch('/api/stock/watchlist');
+        if (!res.ok) {
+            throw new Error('관심 목록 조회 실패');
+        }
+        return res.json();
+    }
+
+    async function loadTopTable(type, tbodyId, updatedId) {
+        const tbody = document.getElementById(tbodyId);
+        try {
+            const items = await fetchTopList(type);
+            if (!items || items.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-secondary">데이터가 없습니다.</td></tr>';
+                return;
+            }
+
+            const priceResults = await Promise.allSettled(items.map(item => fetchPrice(item.symbol)));
+            const rows = [];
+            priceResults.forEach((result, idx) => {
+                const item = items[idx];
+                if (result.status === 'fulfilled') {
+                    rows.push(buildTopRow(result.value, item));
+                } else {
+                    rows.push(buildTopErrorRow(item));
+                }
+            });
+            tbody.innerHTML = rows.join('');
+            document.getElementById(updatedId).textContent =
+                '업데이트: ' + new Date().toLocaleTimeString('ko-KR');
+        } catch (e) {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-danger">목록을 불러오지 못했습니다.</td></tr>';
+        }
+    }
+
+    async function refreshWatchlist() {
+        const tbody = document.getElementById('watchlistTableBody');
+        try {
+            const items = await fetchWatchlist();
+            watchlistMap.clear();
+            items.forEach(item => watchlistMap.set(item.symbol, item));
+
+            // 그룹 목록 갱신 (저장된 순서 적용)
+            const rawGroups = [...new Set(items.map(i => i.group).filter(g => g && g.trim()))].sort();
+            groupList = applyGroupOrder(rawGroups);
+            renderGroupFilter();
+
+            if (!items || items.length === 0) {
+                watchlistPriceCache = [];
+                tbody.innerHTML =
+                    '<tr><td colspan="8" class="text-center py-4 text-secondary">관심 종목이 없습니다. 검색 결과에서 추가해 주세요.</td></tr>';
+                document.getElementById('watchlistUpdated').textContent = '';
+                return;
+            }
+
+            const priceResults = await Promise.allSettled(items.map(item => fetchPrice(item.symbol)));
+            watchlistPriceCache = [];
+            priceResults.forEach((result, idx) => {
+                const item = items[idx];
+                const price = result.status === 'fulfilled' ? result.value : null;
+                watchlistPriceCache.push({ item, price });
+            });
+
+            renderWatchlistTable();
+            document.getElementById('watchlistUpdated').textContent =
+                '업데이트: ' + new Date().toLocaleTimeString('ko-KR');
+        } catch (e) {
+            tbody.innerHTML =
+                '<tr><td colspan="8" class="text-center py-4 text-danger">관심 목록을 불러오지 못했습니다.</td></tr>';
+        }
+    }
+
+    function renderGroupFilter() {
+        const container = document.getElementById('groupFilter');
+        container.innerHTML = '';
+
+        // "전체" 버튼 (드래그 불가)
+        const allBtn = document.createElement('button');
+        allBtn.className = 'btn btn-sm group-filter-btn ' + (currentGroupFilter === '__all__' ? 'btn-warning' : 'btn-outline-secondary');
+        allBtn.dataset.group = '__all__';
+        allBtn.textContent = '전체 (' + watchlistPriceCache.length + ')';
+        allBtn.addEventListener('click', function() {
+            currentGroupFilter = '__all__';
+            renderGroupFilter();
+            renderWatchlistTable();
+        });
+        container.appendChild(allBtn);
+
+        // 그룹 버튼들 (드래그 가능)
+        groupList.forEach(g => {
+            const count = watchlistPriceCache.filter(r => r.item.group === g).length;
+            const isActive = currentGroupFilter === g;
+
+            const btn = document.createElement('button');
+            btn.className = 'btn btn-sm group-filter-btn ' + (isActive ? 'btn-warning' : 'btn-outline-secondary');
+            btn.dataset.group = g;
+            btn.draggable = true;
+            btn.style.cursor = 'grab';
+
+            const label = document.createTextNode(escHtml(g) + ' (' + count + ') ');
+            btn.appendChild(label);
+
+            const delIcon = document.createElement('i');
+            delIcon.className = 'bi bi-x-circle ms-1 group-delete-btn';
+            delIcon.title = '그룹 삭제';
+            delIcon.addEventListener('click', function(e) {
+                e.stopPropagation();
+                if (confirm('"' + g + '" 그룹을 삭제하시겠습니까?\n소속 종목도 함께 삭제됩니다.')) {
+                    deleteGroup(g);
+                }
+            });
+            btn.appendChild(delIcon);
+
+            // 클릭 → 필터
+            btn.addEventListener('click', function(e) {
+                if (e.target.classList.contains('group-delete-btn')) return;
+                currentGroupFilter = g;
+                renderGroupFilter();
+                renderWatchlistTable();
+            });
+
+            // 드래그 시작
+            btn.addEventListener('dragstart', function(e) {
+                dragSrcGroup = g;
+                btn.style.opacity = '0.4';
+                e.dataTransfer.effectAllowed = 'move';
+            });
+
+            btn.addEventListener('dragend', function() {
+                btn.style.opacity = '1';
+                container.querySelectorAll('.group-filter-btn').forEach(b => b.classList.remove('drag-over'));
+            });
+
+            btn.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                btn.classList.add('drag-over');
+            });
+
+            btn.addEventListener('dragleave', function() {
+                btn.classList.remove('drag-over');
+            });
+
+            // 드롭 → 순서 변경
+            btn.addEventListener('drop', function(e) {
+                e.preventDefault();
+                btn.classList.remove('drag-over');
+                if (!dragSrcGroup || dragSrcGroup === g) return;
+
+                const fromIdx = groupList.indexOf(dragSrcGroup);
+                const toIdx = groupList.indexOf(g);
+                if (fromIdx < 0 || toIdx < 0) return;
+
+                groupList.splice(fromIdx, 1);
+                groupList.splice(toIdx, 0, dragSrcGroup);
+                saveGroupOrder();
+                renderGroupFilter();
+                dragSrcGroup = null;
+            });
+
+            container.appendChild(btn);
+        });
+    }
+
+    function renderWatchlistTable() {
+        const tbody = document.getElementById('watchlistTableBody');
+        let filtered = watchlistPriceCache;
+        if (currentGroupFilter !== '__all__') {
+            filtered = filtered.filter(r => r.item.group === currentGroupFilter);
+        }
+
+        // 정렬
+        filtered = [...filtered].sort((a, b) => {
+            let va, vb;
+            switch (currentSort.key) {
+                case 'name':
+                    va = (a.price?.name || a.item.name || '').toLowerCase();
+                    vb = (b.price?.name || b.item.name || '').toLowerCase();
+                    return currentSort.asc ? va.localeCompare(vb) : vb.localeCompare(va);
+                case 'price':
+                    va = a.price?.currentPrice || 0;
+                    vb = b.price?.currentPrice || 0;
+                    break;
+                case 'changeRate':
+                    va = a.price?.changeRate || 0;
+                    vb = b.price?.changeRate || 0;
+                    break;
+                case 'volume':
+                    va = a.price?.volume || 0;
+                    vb = b.price?.volume || 0;
+                    break;
+                default:
+                    return 0;
+            }
+            return currentSort.asc ? va - vb : vb - va;
+        });
+
+        if (filtered.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-secondary">' +
+                (currentGroupFilter === '__all__' ? '관심 종목이 없습니다. 검색 결과에서 추가해 주세요.' : '이 그룹에 종목이 없습니다.') + '</td></tr>';
+            return;
+        }
+
+        const rows = filtered.map(r => r.price ? buildWatchlistRow(r.price, r.item) : buildWatchlistErrorRow(r.item));
+        tbody.innerHTML = rows.join('');
+    }
+
+    function buildTopRow(price, item) {
+        const isUp = price.priceChange > 0;
+        const isDown = price.priceChange < 0;
+        const colorClass = isUp ? 'text-danger' : (isDown ? 'text-primary' : 'text-light');
+        const sign = isUp ? '+' : '';
+        const icon = isUp ? '&#9650;' : (isDown ? '&#9660;' : '&#9472;');
+        const watchBtn = buildWatchButton(item);
+
+        return '<tr>' +
+            '<td class="fw-semibold">' + escHtml(price.name || item.name) + '</td>' +
+            '<td class="text-secondary font-monospace">' + escHtml(price.symbol) + '</td>' +
+            '<td class="text-end fw-bold">' + formatNumber(price.currentPrice) + '원</td>' +
+            '<td class="text-end ' + colorClass + '">' + icon + ' ' + sign + formatNumber(price.priceChange) + '</td>' +
+            '<td class="text-end ' + colorClass + '">' + sign + Number(price.changeRate || 0).toFixed(2) + '%</td>' +
+            '<td class="text-end text-secondary">' + formatNumber(price.volume) + '</td>' +
+            '<td class="text-center">' +
+            '<a href="/chart/' + escHtml(price.symbol) + '" class="btn btn-sm btn-outline-warning me-1">차트</a>' +
+            watchBtn +
+            '</td>' +
+            '</tr>';
+    }
+
+    function buildTopErrorRow(item) {
+        return '<tr>' +
+            '<td class="fw-semibold">' + escHtml(item.name) + '</td>' +
+            '<td class="text-secondary font-monospace">' + escHtml(item.symbol) + '</td>' +
+            '<td colspan="4" class="text-secondary text-center small">조회 실패</td>' +
+            '<td class="text-center">' +
+            '<a href="/chart/' + escHtml(item.symbol) + '" class="btn btn-sm btn-outline-warning me-1">차트</a>' +
+            buildWatchButton(item) +
+            '</td>' +
+            '</tr>';
+    }
+
+    function buildGroupSelect(symbol, currentGroup) {
+        let opts = groupList.map(g =>
+            '<option value="' + escHtml(g) + '"' + (g === currentGroup ? ' selected' : '') + '>' + escHtml(g) + '</option>'
+        ).join('');
+        const compositeKey = symbol + '|' + currentGroup;
+        return '<select class="form-select form-select-sm bg-dark text-light border-secondary group-move-select" ' +
+            'data-composite-key="' + escHtml(compositeKey) + '" data-symbol="' + escHtml(symbol) + '" ' +
+            'style="width:auto;min-width:70px;font-size:0.75rem;padding:2px 6px">' +
+            opts + '</select>';
+    }
+
+    function buildWatchlistRow(price, item) {
+        const isUp = price.priceChange > 0;
+        const isDown = price.priceChange < 0;
+        const colorClass = isUp ? 'text-danger' : (isDown ? 'text-primary' : 'text-light');
+        const sign = isUp ? '+' : '';
+        const icon = isUp ? '&#9650;' : (isDown ? '&#9660;' : '&#9472;');
+
+        return '<tr>' +
+            '<td class="fw-semibold">' + escHtml(price.name || item.name) + '</td>' +
+            '<td class="text-secondary font-monospace small">' + escHtml(item.symbol) + '</td>' +
+            '<td><span class="badge ' + (item.type === 'etf' ? 'bg-info' : 'bg-secondary') + '">' +
+            escHtml(item.type === 'etf' ? 'ETF' : '주식') + '</span></td>' +
+            '<td>' + buildGroupSelect(item.symbol, item.group) + '</td>' +
+            '<td class="text-end fw-bold">' + formatNumber(price.currentPrice) + '원</td>' +
+            '<td class="text-end ' + colorClass + '">' + sign + Number(price.changeRate || 0).toFixed(2) + '%</td>' +
+            '<td class="text-end text-secondary">' + formatNumber(price.volume) + '</td>' +
+            '<td class="text-center">' +
+            '<a href="/chart/' + escHtml(item.symbol) + '" class="btn btn-sm btn-outline-warning me-1">차트</a>' +
+            '<button class="btn btn-sm btn-outline-danger" data-action="remove-watch" data-symbol="' + escHtml(item.symbol + '|' + item.group) + '">삭제</button>' +
+            '</td>' +
+            '</tr>';
+    }
+
+    function buildWatchlistErrorRow(item) {
+        return '<tr>' +
+            '<td class="fw-semibold">' + escHtml(item.name || item.symbol) + '</td>' +
+            '<td class="text-secondary font-monospace small">' + escHtml(item.symbol) + '</td>' +
+            '<td><span class="badge ' + (item.type === 'etf' ? 'bg-info' : 'bg-secondary') + '">' +
+            escHtml(item.type === 'etf' ? 'ETF' : '주식') + '</span></td>' +
+            '<td>' + buildGroupSelect(item.symbol, item.group) + '</td>' +
+            '<td colspan="3" class="text-secondary text-center small">조회 실패</td>' +
+            '<td class="text-center">' +
+            '<a href="/chart/' + escHtml(item.symbol) + '" class="btn btn-sm btn-outline-warning me-1">차트</a>' +
+            '<button class="btn btn-sm btn-outline-danger" data-action="remove-watch" data-symbol="' + escHtml(item.symbol + '|' + item.group) + '">삭제</button>' +
+            '</td>' +
+            '</tr>';
+    }
+
+    function buildWatchButton(item) {
+        const symbol = escHtml(item.symbol);
+        const name = escHtml(item.name || item.symbol);
+        const market = escHtml(item.market || '');
+        const type = escHtml(item.type === 'etf' ? 'etf' : 'stock');
+        const exists = watchlistMap.has(item.symbol);
+
+        if (exists) {
+            return '<button class="btn btn-sm btn-outline-danger" data-action="remove-watch" data-symbol="' + symbol + '">' +
+                '관심해제</button>';
+        }
+
+        return '<button class="btn btn-sm btn-outline-success" data-action="add-watch" ' +
+            'data-symbol="' + symbol + '" data-name="' + name + '" data-market="' + market + '" data-type="' + type + '">' +
+            '관심추가</button>';
+    }
+
+    async function addWatchlistItem(item) {
+        const res = await fetch('/api/stock/watchlist', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(item),
+        });
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({ error: '관심 종목 추가 실패' }));
+            throw new Error(error.error || '관심 종목 추가 실패');
+        }
+        return res.json();
+    }
+
+    async function removeWatchlistItem(symbol) {
+        const res = await fetch('/api/stock/watchlist/' + encodeURIComponent(symbol), { method: 'DELETE' });
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({ error: '관심 종목 삭제 실패' }));
+            throw new Error(error.error || '관심 종목 삭제 실패');
+        }
+        return res.json();
+    }
+
+    async function doSearch() {
+        const keyword = searchInputEl.value.trim();
+        if (!keyword) {
+            return;
+        }
+
+        if (/^\d{6}([A-Z]\d?)?$/.test(keyword)) {
+            window.location.href = '/chart/' + keyword;
+            return;
+        }
+
+        const res = await fetch('/api/stock/search?keyword=' + encodeURIComponent(keyword));
+        if (!res.ok) {
+            searchResultsEl.innerHTML = '<div class="p-3 text-danger">검색 실패</div>';
+            searchResultsEl.style.display = 'block';
+            return;
+        }
+        const results = await res.json();
+        showSearchResults(results);
+    }
+
+    function showSearchResults(results) {
+        if (!results || results.length === 0) {
+            searchResultsEl.innerHTML = '<div class="p-3 text-secondary">검색 결과 없음</div>';
+            searchResultsEl.style.display = 'block';
+            return;
+        }
+
+        searchResultsEl.innerHTML = results.map(item => {
+            const badge = item.type === 'etf'
+                ? '<span class="badge bg-info ms-1 small">ETF</span>'
+                : '<span class="badge bg-secondary ms-1 small">' + escHtml(item.market || '') + '</span>';
+            const watchBtn = watchlistMap.has(item.symbol)
+                ? '<button class="btn btn-sm btn-outline-danger" data-action="remove-watch" data-symbol="' + escHtml(item.symbol) + '">관심해제</button>'
+                : '<button class="btn btn-sm btn-outline-success" data-action="add-watch" data-symbol="' + escHtml(item.symbol) + '" data-name="' + escHtml(item.name) + '" data-market="' + escHtml(item.market || '') + '" data-type="' + escHtml(item.type === 'etf' ? 'etf' : 'stock') + '">관심추가</button>';
+
+            return '<div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom border-secondary">' +
+                '<a href="/chart/' + escHtml(item.symbol) + '" class="text-light text-decoration-none">' +
+                '<span class="fw-semibold">' + escHtml(item.name) + '</span>' +
+                '<span class="text-secondary ms-2 font-monospace small">' + escHtml(item.symbol) + '</span>' +
+                badge +
+                '</a>' +
+                watchBtn +
+                '</div>';
+        }).join('');
+        searchResultsEl.style.display = 'block';
+    }
+
+    function bindEvents() {
+        searchInputEl.addEventListener('input', function () {
+            clearTimeout(searchDebounceTimer);
+            const keyword = this.value.trim();
+            if (keyword.length < 1) {
+                searchResultsEl.style.display = 'none';
+                return;
+            }
+            searchDebounceTimer = setTimeout(() => {
+                doSearch().catch(() => {
+                    searchResultsEl.innerHTML = '<div class="p-3 text-danger">검색 실패</div>';
+                    searchResultsEl.style.display = 'block';
+                });
+            }, 300);
+        });
+
+        searchInputEl.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') {
+                clearTimeout(searchDebounceTimer);
+                doSearch().catch(() => {
+                    searchResultsEl.innerHTML = '<div class="p-3 text-danger">검색 실패</div>';
+                    searchResultsEl.style.display = 'block';
+                });
+            }
+        });
+
+        document.addEventListener('click', function (e) {
+            if (!e.target.closest('#searchInput') && !e.target.closest('#searchResults')) {
+                searchResultsEl.style.display = 'none';
+            }
+
+            const actionEl = e.target.closest('button[data-action]');
+            if (!actionEl) {
+                return;
+            }
+
+            const action = actionEl.dataset.action;
+            if (action === 'add-watch') {
+                if (groupList.length === 0) {
+                    alert('먼저 그룹을 추가해 주세요. (관심 종목 탭의 폴더+ 버튼)');
+                    return;
+                }
+                showGroupSelector(actionEl);
+                return;
+            } else if (action === 'remove-watch') {
+                removeWatchlistItem(actionEl.dataset.symbol)
+                    .then(items => {
+                        watchlistMap.clear();
+                        items.forEach(item => watchlistMap.set(item.symbol, item));
+                        return Promise.all([
+                            loadTopTable('stock', 'stockTableBody', 'stockUpdated'),
+                            loadTopTable('etf', 'etfTableBody', 'etfUpdated'),
+                            refreshWatchlist(),
+                            doSearch(),
+                        ]);
+                    })
+                    .catch(err => {
+                        alert(err.message);
+                    });
+            }
+        });
+    }
+
+    // 그룹 이동 (select 변경) — composite key(symbol|oldGroup) 전달
+    document.addEventListener('change', function(e) {
+        if (!e.target.classList.contains('group-move-select')) return;
+        const compositeKey = e.target.dataset.compositeKey;
+        const newGroup = e.target.value;
+        fetch('/api/stock/watchlist/' + encodeURIComponent(compositeKey) + '/group', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ group: newGroup }),
+        }).then(res => res.json()).then(items => {
+            watchlistMap.clear();
+            items.forEach(item => watchlistMap.set(item.symbol, item));
+            watchlistPriceCache.forEach(r => {
+                const updated = items.find(i => i.symbol === r.item.symbol && i.group === r.item.group);
+                if (updated) r.item = updated;
+            });
+            const rawGroups = [...new Set(items.map(i => i.group).filter(g => g && g.trim()))].sort();
+            groupList = applyGroupOrder(rawGroups);
+            saveGroupOrder();
+            renderGroupFilter();
+            renderWatchlistTable();
+        }).catch(err => alert('그룹 이동 실패: ' + err.message));
+    });
+
+    // 정렬 (th 클릭)
+    document.addEventListener('click', function(e) {
+        const th = e.target.closest('.sortable-th');
+        if (!th) return;
+        const key = th.dataset.sort;
+        if (currentSort.key === key) {
+            currentSort.asc = !currentSort.asc;
+        } else {
+            currentSort = { key, asc: key === 'name' };
+        }
+        renderWatchlistTable();
+    });
+
+    function promptAddGroup() {
+        const existing = document.getElementById('addGroupInline');
+        if (existing) { existing.remove(); return; }
+
+        const container = document.getElementById('groupFilter');
+        const wrapper = document.createElement('div');
+        wrapper.id = 'addGroupInline';
+        wrapper.className = 'd-inline-flex align-items-center gap-1 ms-1';
+        wrapper.innerHTML =
+            '<input type="text" class="form-control form-control-sm bg-dark text-light border-secondary" ' +
+            'id="newGroupInput" placeholder="그룹명" style="width:100px;font-size:0.78rem">' +
+            '<button class="btn btn-sm btn-success" id="confirmAddGroup" style="font-size:0.75rem">확인</button>' +
+            '<button class="btn btn-sm btn-outline-secondary" id="cancelAddGroup" style="font-size:0.75rem">취소</button>';
+        container.appendChild(wrapper);
+
+        const input = document.getElementById('newGroupInput');
+        input.focus();
+
+        function doAdd() {
+            const trimmed = input.value.trim();
+            if (!trimmed) return;
+            if (groupList.includes(trimmed)) { alert('이미 존재하는 그룹입니다.'); return; }
+            groupList.push(trimmed);
+            saveGroupOrder();
+            wrapper.remove();
+            renderGroupFilter();
+        }
+
+        document.getElementById('confirmAddGroup').addEventListener('click', doAdd);
+        document.getElementById('cancelAddGroup').addEventListener('click', () => wrapper.remove());
+        input.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') doAdd();
+            if (e.key === 'Escape') wrapper.remove();
+        });
+    }
+
+    async function deleteGroup(groupName) {
+        try {
+            const res = await fetch('/api/stock/watchlist/groups/' + encodeURIComponent(groupName), { method: 'DELETE' });
+            if (!res.ok) throw new Error('그룹 삭제 실패');
+            const items = await res.json();
+            watchlistMap.clear();
+            items.forEach(item => watchlistMap.set(item.symbol, item));
+            watchlistPriceCache = watchlistPriceCache.filter(r =>
+                items.some(i => i.symbol === r.item.symbol && i.group === r.item.group));
+            watchlistPriceCache.forEach(r => {
+                const updated = items.find(i => i.symbol === r.item.symbol && i.group === r.item.group);
+                if (updated) r.item = updated;
+            });
+            const rawGroups = [...new Set(items.map(i => i.group).filter(g => g && g.trim()))].sort();
+            groupList = applyGroupOrder(rawGroups);
+            saveGroupOrder();
+            if (currentGroupFilter === groupName) currentGroupFilter = '__all__';
+            renderGroupFilter();
+            renderWatchlistTable();
+        } catch (err) {
+            alert(err.message);
+        }
+    }
+
+    function showGroupSelector(btnEl) {
+        closeGroupSelector();
+        const rect = btnEl.getBoundingClientRect();
+        const popup = document.createElement('div');
+        popup.id = 'groupSelectorPopup';
+        popup.className = 'bg-dark border border-secondary rounded shadow';
+        popup.style.cssText = 'position:fixed;z-index:2000;min-width:140px;max-height:250px;overflow-y:auto;' +
+            'top:' + (rect.bottom + 4) + 'px;left:' + rect.left + 'px;';
+
+        const header = document.createElement('div');
+        header.className = 'px-3 py-2 border-bottom border-secondary text-secondary small';
+        header.textContent = '그룹 선택';
+        popup.appendChild(header);
+
+        if (groupList.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'px-3 py-2 text-secondary small';
+            empty.textContent = '그룹이 없습니다.';
+            popup.appendChild(empty);
+        } else {
+            groupList.forEach(g => {
+                const item = document.createElement('div');
+                item.className = 'px-3 py-2 text-light search-item';
+                item.style.cursor = 'pointer';
+                item.textContent = g;
+                item.addEventListener('click', function() {
+                    closeGroupSelector();
+                    doAddWatch(btnEl, g);
+                });
+                popup.appendChild(item);
+            });
+        }
+
+        document.body.appendChild(popup);
+        groupSelectorTarget = btnEl;
+
+        setTimeout(() => {
+            document.addEventListener('click', closeGroupSelectorOnOutside);
+        }, 0);
+    }
+
+    function closeGroupSelector() {
+        const popup = document.getElementById('groupSelectorPopup');
+        if (popup) popup.remove();
+        document.removeEventListener('click', closeGroupSelectorOnOutside);
+        groupSelectorTarget = null;
+    }
+
+    function closeGroupSelectorOnOutside(e) {
+        const popup = document.getElementById('groupSelectorPopup');
+        if (popup && !popup.contains(e.target)) {
+            closeGroupSelector();
+        }
+    }
+
+    function doAddWatch(btnEl, group) {
+        const payload = {
+            symbol: btnEl.dataset.symbol,
+            name: btnEl.dataset.name,
+            market: btnEl.dataset.market,
+            type: btnEl.dataset.type,
+            group: group,
+        };
+        addWatchlistItem(payload)
+            .then(items => {
+                watchlistMap.clear();
+                items.forEach(item => watchlistMap.set(item.symbol, item));
+                return Promise.all([
+                    loadTopTable('stock', 'stockTableBody', 'stockUpdated'),
+                    loadTopTable('etf', 'etfTableBody', 'etfUpdated'),
+                    refreshWatchlist(),
+                    doSearch(),
+                ]);
+            })
+            .catch(err => {
+                alert(err.message);
+            });
+    }
+
+    function formatNumber(n) {
+        if (n === undefined || n === null) {
+            return '-';
+        }
+        return Number(n).toLocaleString('ko-KR');
+    }
+
+    function escHtml(str) {
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    let refreshCountdown = 600;
+    let countdownInterval = null;
+
+    function updateCountdownDisplay() {
+        const min = Math.floor(refreshCountdown / 60);
+        const sec = refreshCountdown % 60;
+        const el = document.getElementById('nextRefresh');
+        if (el) {
+            el.textContent = '다음 갱신: ' + min + '분 ' + (sec < 10 ? '0' : '') + sec + '초';
+        }
+    }
+
+    function startCountdown() {
+        if (countdownInterval) clearInterval(countdownInterval);
+        refreshCountdown = 600;
+        updateCountdownDisplay();
+        countdownInterval = setInterval(() => {
+            refreshCountdown--;
+            if (refreshCountdown <= 0) {
+                refreshAll();
+            } else {
+                updateCountdownDisplay();
+            }
+        }, 1000);
+    }
+
+    async function refreshAll() {
+        refreshCountdown = 600;
+        updateCountdownDisplay();
+        await Promise.all([
+            loadTopTable('stock', 'stockTableBody', 'stockUpdated'),
+            loadTopTable('etf', 'etfTableBody', 'etfUpdated'),
+            refreshWatchlist(),
+        ]);
+        startCountdown();
+    }
+
+    async function initialize() {
+        bindEvents();
+        await refreshWatchlist();
+        await Promise.all([
+            loadTopTable('stock', 'stockTableBody', 'stockUpdated'),
+            loadTopTable('etf', 'etfTableBody', 'etfUpdated'),
+        ]);
+        startCountdown();
+    }
+
+    initialize();
+</script>
+</body>
+</html>

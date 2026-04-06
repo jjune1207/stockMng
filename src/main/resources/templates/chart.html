@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${pageTitle}">종목 차트</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<body class="bg-dark text-light">
+
+<nav class="navbar navbar-dark bg-black border-bottom border-secondary px-4">
+    <a class="navbar-brand fw-bold" href="/">
+        <i class="bi bi-bar-chart-fill text-warning me-2"></i>주식 분석 차트
+    </a>
+    <div class="d-flex align-items-center gap-2">
+        <div class="input-group input-group-sm" style="width: 260px;">
+            <input type="text" id="quickSearch" class="form-control bg-dark text-light border-secondary"
+                   placeholder="종목 검색..." autocomplete="off">
+        </div>
+        <a href="/" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i>목록
+        </a>
+    </div>
+</nav>
+
+<!-- 빠른 검색 결과 -->
+<div id="quickSearchResults" class="position-fixed bg-dark border border-secondary rounded"
+     style="z-index: 2000; display: none; max-height: 300px; overflow-y: auto; top: 55px; right: 80px; width: 300px;">
+</div>
+
+<div class="container-fluid px-3 py-3">
+    <div class="row g-3">
+
+        <!-- 왼쪽: 차트 영역 -->
+        <div class="col-lg-9">
+
+            <!-- 종목 헤더 + 기간 탭 -->
+            <div class="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2">
+                <div>
+                    <span id="stockName" class="fs-5 fw-bold me-2">로딩 중...</span>
+                    <span id="stockSymbol" class="text-secondary font-monospace" th:text="${symbol}"></span>
+                    <span id="stockType" class="badge bg-secondary ms-1 small"></span>
+                </div>
+                <div class="btn-group" role="group">
+                    <button class="btn btn-outline-secondary period-btn" data-days="22">1개월</button>
+                    <button class="btn btn-outline-secondary period-btn" data-days="66">3개월</button>
+                    <button class="btn btn-outline-secondary period-btn active" data-days="132">6개월</button>
+                    <button class="btn btn-outline-secondary period-btn" data-days="252">1년</button>
+                    <button class="btn btn-outline-secondary period-btn" data-days="504">2년</button>
+                    <button class="btn btn-outline-secondary period-btn" data-days="0">전체</button>
+                </div>
+            </div>
+
+            <!-- 지표 오버레이 체크박스 -->
+            <div class="indicator-panel mb-2 d-flex flex-wrap gap-3 align-items-center">
+                <small class="text-secondary fw-semibold">이동평균선</small>
+                <div class="form-check form-check-inline mb-0">
+                    <input class="form-check-input" type="checkbox" id="chkMA5">
+                    <label class="form-check-label small" for="chkMA5" style="color:#ffeb3b">MA 5</label>
+                </div>
+                <div class="form-check form-check-inline mb-0">
+                    <input class="form-check-input" type="checkbox" id="chkMA20">
+                    <label class="form-check-label small" for="chkMA20" style="color:#4fc3f7">MA 20</label>
+                </div>
+                <div class="form-check form-check-inline mb-0">
+                    <input class="form-check-input" type="checkbox" id="chkMA50" checked>
+                    <label class="form-check-label small" for="chkMA50" style="color:#ff9800">MA 50</label>
+                </div>
+                <div class="form-check form-check-inline mb-0">
+                    <input class="form-check-input" type="checkbox" id="chkMA100" checked>
+                    <label class="form-check-label small" for="chkMA100" style="color:#2196f3">MA 100</label>
+                </div>
+                <div class="form-check form-check-inline mb-0">
+                    <input class="form-check-input" type="checkbox" id="chkMA200" checked>
+                    <label class="form-check-label small" for="chkMA200" style="color:#e91e63">MA 200</label>
+                </div>
+                <div class="vr mx-1"></div>
+                <small class="text-secondary fw-semibold">오버레이</small>
+                <div class="form-check form-check-inline mb-0">
+                    <input class="form-check-input" type="checkbox" id="chkBollinger">
+                    <label class="form-check-label small" for="chkBollinger" style="color:#4caf50">볼린저</label>
+                </div>
+                <div class="vr mx-1"></div>
+                <small class="text-secondary fw-semibold">보조지표</small>
+                <div class="form-check form-check-inline mb-0">
+                    <input class="form-check-input" type="checkbox" id="chkRSI">
+                    <label class="form-check-label small" for="chkRSI">RSI</label>
+                </div>
+                <div class="form-check form-check-inline mb-0">
+                    <input class="form-check-input" type="checkbox" id="chkMACD">
+                    <label class="form-check-label small" for="chkMACD">MACD</label>
+                </div>
+            </div>
+
+            <!-- 차트 컨테이너 -->
+            <div id="chartContainer" class="position-relative">
+                <div id="chartLoading">
+                    <div class="text-center text-light">
+                        <div class="spinner-border text-warning mb-2"></div>
+                        <div class="small">차트 데이터 로딩 중...</div>
+                    </div>
+                </div>
+
+                <div id="mainChart"></div>
+                <div class="chart-divider"></div>
+                <div id="volumeChart"></div>
+
+                <div id="rsiPanel" style="display:none">
+                    <div class="chart-divider"></div>
+                    <div class="px-2 pt-1"><small class="text-secondary">RSI (14)</small></div>
+                    <div id="rsiChart"></div>
+                </div>
+
+                <div id="macdPanel" style="display:none">
+                    <div class="chart-divider"></div>
+                    <div class="px-2 pt-1"><small class="text-secondary">MACD (12, 26, 9)</small></div>
+                    <div id="macdChart"></div>
+                </div>
+            </div>
+
+            <!-- 종합 매수/매도 분석 -->
+            <div id="tradingAnalysisPanel" class="mt-3 card bg-dark border-secondary">
+                <div class="card-header border-secondary d-flex justify-content-between align-items-center">
+                    <span class="small fw-semibold" style="color:#ffc107">
+                        <i class="bi bi-lightning-charge-fill me-1"></i>종합 매매 분석
+                    </span>
+                    <span id="tradingVerdict" class="badge fs-6"></span>
+                </div>
+                <div class="card-body" id="tradingAnalysisContent">
+                    <div class="text-secondary small">차트 데이터 로딩 중...</div>
+                </div>
+            </div>
+
+            <!-- MA 크로스 시그널 분석 -->
+            <div id="analysisPanel" class="mt-3 card bg-dark border-secondary" style="display:none">
+                <div class="card-header border-secondary small text-secondary fw-semibold">
+                    <i class="bi bi-clipboard-data me-1"></i>이동평균선 분석
+                </div>
+                <div class="card-body" id="analysisContent"></div>
+            </div>
+        </div>
+
+        <!-- 오른쪽: 정보 패널 -->
+        <div class="col-lg-3">
+            <div class="card bg-dark border-secondary">
+                <div class="card-header border-secondary small text-secondary fw-semibold">현재 시세</div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <div class="info-label">현재가</div>
+                        <div id="infoCurrentPrice" class="info-value fs-4">—</div>
+                        <div id="infoPriceChange" class="small mt-1">—</div>
+                    </div>
+                    <hr class="border-secondary my-2">
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <div class="info-label">시가</div>
+                            <div id="infoOpen" class="info-value small">—</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="info-label">종가</div>
+                            <div id="infoClose" class="info-value small">—</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="info-label">고가</div>
+                            <div id="infoHigh" class="info-value small price-up">—</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="info-label">저가</div>
+                            <div id="infoLow" class="info-value small price-down">—</div>
+                        </div>
+                        <div class="col-12">
+                            <div class="info-label">거래량</div>
+                            <div id="infoVolume" class="info-value small">—</div>
+                        </div>
+                    </div>
+                    <hr class="border-secondary my-2">
+                    <div class="small text-secondary">데이터: 네이버 증권</div>
+                    <div class="small text-secondary" id="infoCandleCount"></div>
+                </div>
+            </div>
+
+            <!-- MA 현재값 패널 -->
+            <div class="card bg-dark border-secondary mt-3">
+                <div class="card-header border-secondary small text-secondary fw-semibold">
+                    이동평균선 현재값
+                </div>
+                <div class="card-body" id="maValues">
+                    <div class="text-secondary small">데이터 로딩 중...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script th:src="@{/js/chart.js}"></script>
+<script th:inline="javascript">
+    const symbol = /*[[${symbol}]]*/ '005930';
+    document.addEventListener('DOMContentLoaded', function() { initChart(symbol); });
+</script>
+</body>
+</html>

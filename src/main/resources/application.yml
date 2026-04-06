@@ -1,0 +1,26 @@
+server:
+  port: ${SERVER_PORT:8080}
+  shutdown: graceful
+
+spring:
+  application:
+    name: stock-chart
+  cache:
+    type: caffeine
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+
+naver:
+  chart-url: https://fchart.stock.naver.com/siseJson.nhn
+  search-url: https://ac.stock.naver.com/ac
+  stock-basic-url: https://m.stock.naver.com/api/stock
+  etf-basic-url: https://m.stock.naver.com/api/etf
+
+cache:
+  candle-ttl-minutes: 10
+  price-ttl-seconds: 30
+
+logging:
+  level:
+    com.example.stockchart: DEBUG
+    org.springframework.web.reactive.function.client: WARN
