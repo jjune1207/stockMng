@@ -41,7 +41,7 @@ gradlew.bat test
 
 - Thymeleaf SSR 템플릿(`index.html`, `chart.html`) + TradingView Lightweight Charts v4
 - `static/js/chart.js`: 차트 렌더링, 타임프레임 전환, 종합 매매 분석 로직
-- `static/css/style.css`: 다크 테마
+- `static/css/style.css`: 다크/라이트 테마 (토글 지원)
 
 ### 데이터 흐름
 
