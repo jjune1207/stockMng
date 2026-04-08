@@ -19,6 +19,10 @@ var GRID_COLOR = '#1e222d';
 var BORDER_COLOR = '#2a2e39';
 var TEXT_COLOR = '#d1d4dc';
 
+function isDarkTheme() {
+    return document.body.getAttribute('data-bs-theme') !== 'light';
+}
+
 function initChart(symbol) {
     currentSymbol = symbol;
 
@@ -314,9 +318,10 @@ function updateMAValues() {
     var last = currentData.candles.length - 1;
     var lastPrice = currentData.candles[last].close;
 
+    var dark = isDarkTheme();
     var maList = [
-        { name: 'MA 5', values: currentData.ma5, color: '#ffeb3b' },
-        { name: 'MA 20', values: currentData.ma20, color: '#4fc3f7' },
+        { name: 'MA 5', values: currentData.ma5, color: dark ? '#ffeb3b' : '#b8860b' },
+        { name: 'MA 20', values: currentData.ma20, color: dark ? '#4fc3f7' : '#0277bd' },
         { name: 'MA 50', values: currentData.ma50, color: '#ff9800' },
         { name: 'MA 100', values: currentData.ma100, color: '#2196f3' },
         { name: 'MA 200', values: currentData.ma200, color: '#e91e63' },
@@ -331,11 +336,12 @@ function updateMAValues() {
                 '<span class="small text-secondary">데이터 부족</span></div>';
         } else {
             var diff = ((lastPrice - val) / val * 100).toFixed(2);
-            var diffClass = diff > 0 ? 'price-up' : diff < 0 ? 'price-down' : 'text-light';
+            var diffClass = diff > 0 ? 'price-up' : diff < 0 ? 'price-down' : (isDarkTheme() ? 'text-light' : 'text-secondary');
             var diffSign = diff > 0 ? '+' : '';
+            var valClass = isDarkTheme() ? 'text-light' : 'text-dark';
             html += '<div class="d-flex justify-content-between align-items-center mb-1">' +
                 '<span class="small" style="color:' + ma.color + '">' + ma.name + '</span>' +
-                '<span class="small text-light">' + formatNumber(val) + '</span>' +
+                '<span class="small ' + valClass + '">' + formatNumber(val) + '</span>' +
                 '<span class="small ' + diffClass + '">' + diffSign + diff + '%</span></div>';
         }
     });
@@ -535,13 +541,13 @@ function analyzeTradingSignal() {
     } else if (totalScore >= 3) {
         verdict = '매수'; verdictClass = 'text-white'; verdictBg = 'bg-danger bg-opacity-75';
     } else if (totalScore >= 1) {
-        verdict = '매수 관망'; verdictClass = 'text-light'; verdictBg = 'bg-warning bg-opacity-50';
+        verdict = '매수 관망'; verdictClass = isDarkTheme() ? 'text-light' : 'text-dark'; verdictBg = 'bg-warning bg-opacity-50';
     } else if (totalScore <= -5) {
         verdict = '강력 매도'; verdictClass = 'text-white'; verdictBg = 'bg-primary';
     } else if (totalScore <= -3) {
         verdict = '매도'; verdictClass = 'text-white'; verdictBg = 'bg-primary bg-opacity-75';
     } else if (totalScore <= -1) {
-        verdict = '매도 관망'; verdictClass = 'text-light'; verdictBg = 'bg-info bg-opacity-50';
+        verdict = '매도 관망'; verdictClass = isDarkTheme() ? 'text-light' : 'text-dark'; verdictBg = 'bg-info bg-opacity-50';
     } else {
         verdict = '중립 (관망)'; verdictClass = 'text-dark'; verdictBg = 'bg-secondary';
     }
@@ -549,9 +555,14 @@ function analyzeTradingSignal() {
     verdictEl.className = 'badge fs-6 ' + verdictBg + ' ' + verdictClass;
     verdictEl.textContent = verdict + ' (' + (totalScore > 0 ? '+' : '') + totalScore + '/' + maxScore + ')';
 
+    var dark = isDarkTheme();
+    var tdText = dark ? 'text-light' : 'text-dark';
+    var commentBg = dark ? 'background:#1a1e2e;border:1px solid #2a2e39' : 'background:#f8f9fa;border:1px solid #dee2e6';
+    var commentText = dark ? 'text-light' : 'text-dark';
+
     var html = '<div class="mb-3 small text-secondary">MA, 볼린저밴드, 거래량, 모멘텀을 종합 분석한 결과입니다.</div>';
 
-    html += '<table class="table table-dark table-sm mb-3" style="font-size:0.82rem">';
+    html += '<table class="table ' + (dark ? 'table-dark' : '') + ' table-sm mb-3" style="font-size:0.82rem">';
     html += '<thead><tr class="text-secondary"><th>지표</th><th>신호</th><th>근거</th></tr></thead><tbody>';
     scores.forEach(function(s) {
         var signalIcon, signalText, signalClass;
@@ -561,15 +572,15 @@ function analyzeTradingSignal() {
         else if (s.score === -1){ signalIcon = '&#9660;';        signalText = '매도';      signalClass = 'text-primary'; }
         else                    { signalIcon = '&#9660;&#9660;'; signalText = '강력 매도'; signalClass = 'text-primary fw-bold'; }
 
-        html += '<tr><td class="text-light">' + escHtml(s.name) + '</td>';
+        html += '<tr><td class="' + tdText + '">' + escHtml(s.name) + '</td>';
         html += '<td class="' + signalClass + '">' + signalIcon + ' ' + signalText + '</td>';
         html += '<td class="text-secondary">' + escHtml(s.reason) + '</td></tr>';
     });
     html += '</tbody></table>';
 
-    html += '<div class="p-3 rounded" style="background:#1a1e2e;border:1px solid #2a2e39">';
-    html += '<div class="fw-bold mb-2" style="color:#ffc107"><i class="bi bi-chat-left-text me-1"></i>종합 코멘트</div>';
-    html += '<div class="small text-light" style="line-height:1.7">';
+    html += '<div class="p-3 rounded" style="' + commentBg + '">';
+    html += '<div class="fw-bold mb-2" style="color:' + (dark ? '#ffc107' : '#d48800') + '"><i class="bi bi-chat-left-text me-1"></i>종합 코멘트</div>';
+    html += '<div class="small ' + commentText + '" style="line-height:1.7">';
     html += generateComment(scores, totalScore, price, ma50Val, ma200Val, verdict);
     html += '</div></div>';
 
@@ -580,12 +591,15 @@ function analyzeTradingSignal() {
 
 function generateComment(scores, totalScore, price, ma50Val, ma200Val, verdict) {
     var lines = [];
+    var dark = isDarkTheme();
+    var bearColor = dark ? '#42a5f5' : '#1565c0';
+    var goldColor = dark ? '#ffc107' : '#d48800';
 
     if (ma50Val && ma200Val) {
         if (ma50Val > ma200Val) {
             lines.push('현재 이동평균선이 <strong style="color:#ef5350">정배열</strong> 상태로 중장기 상승 추세가 유지되고 있습니다.');
         } else {
-            lines.push('현재 이동평균선이 <strong style="color:#42a5f5">역배열</strong> 상태로 중장기 하락 추세에 놓여 있습니다.');
+            lines.push('현재 이동평균선이 <strong style="color:' + bearColor + '">역배열</strong> 상태로 중장기 하락 추세에 놓여 있습니다.');
         }
     }
 
@@ -596,7 +610,7 @@ function generateComment(scores, totalScore, price, ma50Val, ma200Val, verdict) 
 
     var crossScore = scores.find(function(s) { return s.name === '크로스'; });
     if (crossScore && crossScore.score === 2) {
-        lines.push('<strong style="color:#ffc107">골든크로스</strong>가 최근 발생하여 중기적 매수 신호가 강화되고 있습니다.');
+        lines.push('<strong style="color:' + goldColor + '">골든크로스</strong>가 최근 발생하여 중기적 매수 신호가 강화되고 있습니다.');
     } else if (crossScore && crossScore.score === -2) {
         lines.push('<strong style="color:#ef5350">데드크로스</strong>가 최근 발생하여 중기적 매도 압력이 강화되고 있습니다.');
     }
@@ -641,8 +655,9 @@ async function quickSearchDo(keyword) {
         var badge = s.type === 'etf'
             ? '<span class="badge bg-info ms-1" style="font-size:0.65rem">ETF</span>'
             : '<span class="badge bg-secondary ms-1" style="font-size:0.65rem">' + escHtml(s.market || '') + '</span>';
+        var linkText = isDarkTheme() ? 'text-light' : 'text-dark';
         return '<a href="/chart/' + escHtml(s.symbol) + '" ' +
-            'class="d-block px-3 py-2 text-light text-decoration-none border-bottom border-secondary search-item small">' +
+            'class="d-block px-3 py-2 ' + linkText + ' text-decoration-none border-bottom border-secondary search-item small">' +
             '<span class="fw-semibold">' + escHtml(s.name) + '</span> ' +
             '<span class="text-secondary font-monospace">' + escHtml(s.symbol) + '</span>' +
             badge + '</a>';
