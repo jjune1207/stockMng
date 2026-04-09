@@ -57,6 +57,13 @@ public class CacheConfig {
                 .maximumSize(20)
                 .build());
 
+        // 시장 지표 캐시: 5분 TTL (코스피/코스닥/환율/WTI/해외지수)
+        cacheManager.registerCustomCache("marketIndicators",
+            Caffeine.newBuilder()
+                .expireAfterWrite(5, TimeUnit.MINUTES)
+                .maximumSize(5)
+                .build());
+
         return cacheManager;
     }
 }

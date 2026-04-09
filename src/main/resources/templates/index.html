@@ -53,6 +53,40 @@
         </div>
     </div>
 
+    <!-- 주요 시장 지표 바 -->
+    <div class="market-indicator-bar border rounded mb-3" id="marketIndicatorBar">
+        <div class="market-indicator-scroll" id="marketIndicatorList">
+            <div class="market-indicator-card skeleton">
+                <div class="skeleton-line short"></div>
+                <div class="skeleton-line long"></div>
+            </div>
+            <div class="market-indicator-card skeleton">
+                <div class="skeleton-line short"></div>
+                <div class="skeleton-line long"></div>
+            </div>
+            <div class="market-indicator-card skeleton">
+                <div class="skeleton-line short"></div>
+                <div class="skeleton-line long"></div>
+            </div>
+            <div class="market-indicator-card skeleton">
+                <div class="skeleton-line short"></div>
+                <div class="skeleton-line long"></div>
+            </div>
+            <div class="market-indicator-card skeleton">
+                <div class="skeleton-line short"></div>
+                <div class="skeleton-line long"></div>
+            </div>
+            <div class="market-indicator-card skeleton">
+                <div class="skeleton-line short"></div>
+                <div class="skeleton-line long"></div>
+            </div>
+            <div class="market-indicator-card skeleton">
+                <div class="skeleton-line short"></div>
+                <div class="skeleton-line long"></div>
+            </div>
+        </div>
+    </div>
+
     <ul class="nav nav-tabs border-secondary mb-3" id="stockTab" role="tablist">
         <li class="nav-item" role="presentation">
             <button
@@ -207,6 +241,122 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+    /* ── 주요 시장 지표 ── */
+
+    function formatIndicatorValue(id, value) {
+        if (value === 0 || value === null || value === undefined) return '-';
+        if (id === 'USDKRW') return value.toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        if (id === 'WTI' || id === 'SP500' || id === 'NASDAQ' || id === 'DJI') {
+            return value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+        return value.toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function drawSparkline(canvas, history, isPositive) {
+        if (!canvas || !history || history.length < 2) {
+            if (canvas) {
+                const ctx = canvas.getContext('2d');
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.beginPath();
+                ctx.strokeStyle = 'rgba(128,128,128,0.4)';
+                ctx.lineWidth = 1;
+                ctx.moveTo(0, canvas.height / 2);
+                ctx.lineTo(canvas.width, canvas.height / 2);
+                ctx.stroke();
+            }
+            return;
+        }
+
+        const ctx = canvas.getContext('2d');
+        const w = canvas.width;
+        const h = canvas.height;
+        const min = Math.min(...history);
+        const max = Math.max(...history);
+        const range = max - min || 1;
+        const pad = 3;
+
+        ctx.clearRect(0, 0, w, h);
+
+        // 그라데이션 배경 채우기
+        const gradient = ctx.createLinearGradient(0, 0, 0, h);
+        const color = isPositive ? '239,83,80' : '66,165,245';
+        gradient.addColorStop(0, `rgba(${color},0.25)`);
+        gradient.addColorStop(1, `rgba(${color},0.0)`);
+
+        ctx.beginPath();
+        history.forEach((val, i) => {
+            const x = (i / (history.length - 1)) * w;
+            const y = h - pad - ((val - min) / range) * (h - pad * 2);
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        });
+        ctx.lineTo(w, h);
+        ctx.lineTo(0, h);
+        ctx.closePath();
+        ctx.fillStyle = gradient;
+        ctx.fill();
+
+        // 라인
+        ctx.beginPath();
+        ctx.strokeStyle = isPositive ? '#ef5350' : '#42a5f5';
+        ctx.lineWidth = 1.5;
+        ctx.lineJoin = 'round';
+        history.forEach((val, i) => {
+            const x = (i / (history.length - 1)) * w;
+            const y = h - pad - ((val - min) / range) * (h - pad * 2);
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+    }
+
+    async function loadMarketIndicators() {
+        try {
+            const res = await fetch('/api/stock/market-indicators');
+            if (!res.ok) throw new Error('시장 지표 조회 실패');
+            const indicators = await res.json();
+            renderMarketIndicators(indicators);
+        } catch (e) {
+            document.getElementById('marketIndicatorList').innerHTML =
+                '<div class="text-secondary px-4 py-2 small">시장 지표를 불러오지 못했습니다.</div>';
+        }
+    }
+
+    function renderMarketIndicators(indicators) {
+        const container = document.getElementById('marketIndicatorList');
+        const isDark = getStoredTheme() === 'dark';
+
+        container.innerHTML = indicators.map(ind => {
+            const isPositive = ind.changeRate >= 0;
+            const changeSign = isPositive ? '+' : '';
+            const changeClass = ind.changeRate === 0 ? 'neutral' : (isPositive ? 'positive' : 'negative');
+            const arrow = ind.changeRate === 0 ? '' : (isPositive ? '▲' : '▼');
+            const valueStr = formatIndicatorValue(ind.id, ind.currentValue);
+            const changeStr = ind.change !== 0
+                ? `${changeSign}${Math.abs(ind.change).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`
+                : '-';
+            const rateStr = ind.changeRate !== 0
+                ? `${changeSign}${Math.abs(ind.changeRate).toFixed(2)}%`
+                : '0.00%';
+
+            return `<div class="market-indicator-card" data-id="${ind.id}">
+                <div class="indicator-top">
+                    <span class="indicator-name">${ind.name}</span>
+                    <span class="indicator-rate ${changeClass}">${arrow} ${rateStr}</span>
+                </div>
+                <div class="indicator-value">${valueStr}</div>
+                <div class="indicator-change ${changeClass}">${changeStr}</div>
+                <canvas class="indicator-spark" data-id="${ind.id}" width="150" height="48"></canvas>
+            </div>`;
+        }).join('');
+
+        // 스파크라인 그리기
+        indicators.forEach(ind => {
+            const canvas = container.querySelector(`canvas[data-id="${ind.id}"]`);
+            drawSparkline(canvas, ind.history, ind.changeRate >= 0);
+        });
+    }
+
     /* ── 테마 전환 ── */
     function getStoredTheme() { return localStorage.getItem('theme') || 'dark'; }
 
@@ -257,6 +407,13 @@
             searchRes.classList.toggle('bg-white', !isDark);
             searchRes.classList.toggle('border-secondary', isDark);
             searchRes.classList.toggle('border-light-subtle', !isDark);
+        }
+
+        // 시장 지표 바 테마 전환
+        const indicatorBar = document.getElementById('marketIndicatorBar');
+        if (indicatorBar) {
+            indicatorBar.classList.toggle('border-secondary', isDark);
+            indicatorBar.classList.toggle('border-light-subtle', !isDark);
         }
 
         localStorage.setItem('theme', theme);
@@ -536,7 +693,7 @@
     function buildTopRow(price, item) {
         const isUp = price.priceChange > 0;
         const isDown = price.priceChange < 0;
-        const colorClass = isUp ? 'text-danger' : (isDown ? 'text-primary' : 'text-light');
+        const colorClass = isUp ? 'price-up' : (isDown ? 'price-down' : 'price-flat');
         const sign = isUp ? '+' : '';
         const icon = isUp ? '&#9650;' : (isDown ? '&#9660;' : '&#9472;');
         const watchBtn = buildWatchButton(item);
@@ -586,7 +743,7 @@
     function buildWatchlistRow(price, item) {
         const isUp = price.priceChange > 0;
         const isDown = price.priceChange < 0;
-        const colorClass = isUp ? 'text-danger' : (isDown ? 'text-primary' : 'text-light');
+        const colorClass = isUp ? 'price-up' : (isDown ? 'price-down' : 'price-flat');
         const sign = isUp ? '+' : '';
         const icon = isUp ? '&#9650;' : (isDown ? '&#9660;' : '&#9472;');
 
@@ -1001,6 +1158,7 @@
         refreshCountdown = 600;
         updateCountdownDisplay();
         await Promise.all([
+            loadMarketIndicators(),
             loadTopTable('stock', 'stockTableBody', 'stockUpdated'),
             loadTopTable('etf', 'etfTableBody', 'etfUpdated'),
             refreshWatchlist(),
@@ -1010,6 +1168,7 @@
 
     async function initialize() {
         bindEvents();
+        loadMarketIndicators(); // 시장 지표는 독립적으로 먼저 로드
         await refreshWatchlist();
         await Promise.all([
             loadTopTable('stock', 'stockTableBody', 'stockUpdated'),

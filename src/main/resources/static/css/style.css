@@ -74,8 +74,154 @@ body {
 }
 
 /* ──────────────────────────────────────────
+   주요 시장 지표 바
+────────────────────────────────────────── */
+.market-indicator-bar {
+    background: rgba(0, 0, 0, 0.25);
+    border-color: #495057 !important;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.market-indicator-scroll {
+    display: flex;
+    flex-direction: row;
+    gap: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.market-indicator-scroll::-webkit-scrollbar {
+    display: none;
+}
+
+.market-indicator-card {
+    display: flex;
+    flex-direction: column;
+    min-width: 210px;
+    max-width: 260px;
+    padding: 16px 24px;
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+    cursor: default;
+    flex-shrink: 0;
+    transition: background 0.15s;
+}
+
+.market-indicator-card:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.indicator-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.indicator-name {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #adb5bd;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    letter-spacing: 0.02em;
+}
+
+.indicator-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #f8f9fa;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.indicator-change {
+    font-size: 0.85rem;
+    font-weight: 500;
+    margin-bottom: 6px;
+}
+
+.indicator-rate {
+    font-size: 0.82rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.indicator-change.positive,
+.indicator-rate.positive { color: #ef5350; }
+
+.indicator-change.negative,
+.indicator-rate.negative { color: #42a5f5; }
+
+.indicator-change.neutral,
+.indicator-rate.neutral  { color: #adb5bd; }
+
+.indicator-spark {
+    display: block;
+    width: 100%;
+    height: 48px;
+    margin-top: 6px;
+}
+
+/* 스켈레톤 로딩 */
+.market-indicator-card.skeleton {
+    animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+.skeleton-line {
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    margin-bottom: 6px;
+}
+
+.skeleton-line.short  { height: 12px; width: 50%; }
+.skeleton-line.long   { height: 20px; width: 80%; }
+
+@keyframes skeleton-pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.4; }
+}
+
+/* ──────────────────────────────────────────
    라이트 모드 오버라이드
 ────────────────────────────────────────── */
+[data-bs-theme="light"] .market-indicator-bar {
+    background: #f8f9fa;
+    border-color: #dee2e6 !important;
+    border-radius: 6px;
+}
+
+[data-bs-theme="light"] .market-indicator-card {
+    border-right-color: rgba(0, 0, 0, 0.08);
+}
+
+[data-bs-theme="light"] .market-indicator-card:hover {
+    background: rgba(0, 0, 0, 0.04);
+}
+
+[data-bs-theme="light"] .indicator-name {
+    color: #6c757d;
+}
+
+[data-bs-theme="light"] .indicator-value {
+    color: #212529;
+}
+
+[data-bs-theme="light"] .indicator-change.positive,
+[data-bs-theme="light"] .indicator-rate.positive { color: #dc3545; }
+
+[data-bs-theme="light"] .indicator-change.negative,
+[data-bs-theme="light"] .indicator-rate.negative { color: #0d6efd; }
+
+[data-bs-theme="light"] .indicator-change.neutral,
+[data-bs-theme="light"] .indicator-rate.neutral  { color: #6c757d; }
+
+[data-bs-theme="light"] .skeleton-line {
+    background: rgba(0, 0, 0, 0.08);
+}
+
 [data-bs-theme="light"] .nav-tabs {
     border-bottom-color: #dee2e6 !important;
 }
@@ -104,9 +250,9 @@ body {
     background-color: rgba(0, 0, 0, 0.05) !important;
 }
 
-[data-bs-theme="light"] .price-up   { color: #dc3545; }
-[data-bs-theme="light"] .price-down { color: #0d6efd; }
-[data-bs-theme="light"] .price-flat { color: #6c757d; }
+[data-bs-theme="light"] .price-up   { color: #dc3545 !important; }
+[data-bs-theme="light"] .price-down { color: #0d6efd !important; }
+[data-bs-theme="light"] .price-flat { color: #6c757d !important; }
 
 [data-bs-theme="light"] .sortable-th:hover {
     color: #0d6efd !important;
@@ -186,9 +332,9 @@ body {
     letter-spacing: 0.05em;
 }
 
-.price-up   { color: #ef5350; }
-.price-down { color: #42a5f5; }
-.price-flat { color: #e0e0e0; }
+.price-up   { color: #ef5350 !important; }
+.price-down { color: #42a5f5 !important; }
+.price-flat { color: #e0e0e0 !important; }
 
 /* 차트 분리선 */
 .chart-divider {

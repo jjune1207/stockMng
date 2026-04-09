@@ -1,6 +1,7 @@
 package com.example.stockchart.service;
 
 import com.example.stockchart.dto.CandleDto;
+import com.example.stockchart.dto.MarketIndicatorDto;
 import com.example.stockchart.dto.StockPriceDto;
 import com.example.stockchart.dto.StockSearchDto;
 import com.example.stockchart.dto.WatchlistItemDto;
@@ -39,6 +40,10 @@ public class StockDataFacade {
 
     public List<StockSearchDto> getTopByVolume(String type, int limit) {
         return naverStockService.getTopByVolume(type, limit);
+    }
+
+    public List<MarketIndicatorDto> getMarketIndicators() {
+        return naverStockService.getMarketIndicators();
     }
 
     public List<WatchlistItemDto> getWatchlist() {

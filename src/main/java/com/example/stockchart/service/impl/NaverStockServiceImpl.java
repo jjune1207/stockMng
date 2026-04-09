@@ -1,6 +1,7 @@
 package com.example.stockchart.service.impl;
 
 import com.example.stockchart.dto.CandleDto;
+import com.example.stockchart.dto.MarketIndicatorDto;
 import com.example.stockchart.dto.StockPriceDto;
 import com.example.stockchart.dto.StockSearchDto;
 import com.example.stockchart.exception.StockApiException;
@@ -25,6 +26,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -299,6 +301,201 @@ public class NaverStockServiceImpl implements NaverStockService {
             .toList();
     }
 
+    @Override
+    @Cacheable(value = "marketIndicators", key = "'all'")
+    public List<MarketIndicatorDto> getMarketIndicators() {
+        log.info("주요 시장 지표 조회 시작");
+
+        List<MarketIndicatorDto> result = new ArrayList<>();
+        result.add(fetchDomesticIndexIndicator("KOSPI", "KOSPI", "코스피"));
+        result.add(fetchDomesticIndexIndicator("KOSDAQ", "KOSDAQ", "코스닥"));
+        result.add(fetchNaverMarketIndexIndicator("exchange", "FX_USDKRW", "USDKRW", "환율 (USD/KRW)"));
+        result.add(fetchNaverMarketIndexIndicator("energy", "CLcv1", "WTI", "WTI 유가"));
+        result.add(fetchNaverForeignIndexIndicator(".INX", "SP500", "S&P 500"));
+        result.add(fetchNaverForeignIndexIndicator(".IXIC", "NASDAQ", "나스닥"));
+        result.add(fetchNaverForeignIndexIndicator(".DJI", "DJI", "다우지수"));
+
+        return result.stream().filter(Objects::nonNull).toList();
+    }
+
+    /** 국내 지수 (코스피/코스닥) 지표 조회 */
+    private MarketIndicatorDto fetchDomesticIndexIndicator(String code, String id, String name) {
+        try {
+            String response = naverWebClient.get()
+                .uri("https://m.stock.naver.com/api/index/" + code + "/basic")
+                .retrieve()
+                .bodyToMono(String.class)
+                .block();
+
+            if (response == null || response.isBlank()) {
+                return buildEmptyIndicator(id, name);
+            }
+
+            JsonNode root = objectMapper.readTree(response);
+            double price = parseDouble(getTextOrDefault(root, "closePrice", "0").replace(",", ""));
+            double change = parseDouble(getTextOrDefault(root, "compareToPreviousClosePrice", "0").replace(",", ""));
+            double changeRate = parseDouble(getTextOrDefault(root, "fluctuationsRatio", "0"));
+
+            JsonNode compareNode = root.get("compareToPreviousPrice");
+            if (compareNode != null) {
+                String dirCode = getTextOrDefault(compareNode, "code", "3");
+                // code: 1=상한가(UPPER_LIMIT), 2=상승(RISING), 3=보합, 4=하한가(LOWER_LIMIT), 5=하락(FALLING)
+                if ("4".equals(dirCode) || "5".equals(dirCode)) {
+                    change = -Math.abs(change);
+                    changeRate = -Math.abs(changeRate);
+                } else {
+                    change = Math.abs(change);
+                    changeRate = Math.abs(changeRate);
+                }
+            }
+
+            List<Double> history = fetchDomesticHistory(code);
+
+            return MarketIndicatorDto.builder()
+                .id(id).name(name)
+                .currentValue(price).change(change).changeRate(changeRate)
+                .history(history)
+                .build();
+
+        } catch (Exception e) {
+            log.warn("국내 지수 지표 조회 실패: code={}, error={}", code, e.getMessage());
+            return buildEmptyIndicator(id, name);
+        }
+    }
+
+    /** 해외 지수 (S&P 500: .INX, 나스닥: .IXIC, 다우: .DJI) 지표 조회 */
+    private MarketIndicatorDto fetchNaverForeignIndexIndicator(String symbol, String id, String name) {
+        try {
+            String response = naverWebClient.get()
+                .uri("https://api.stock.naver.com/index/" + symbol + "/basic")
+                .retrieve()
+                .bodyToMono(String.class)
+                .block();
+
+            if (response == null || response.isBlank()) {
+                return buildEmptyIndicator(id, name);
+            }
+
+            JsonNode root = objectMapper.readTree(response);
+            double price = parseDouble(getTextOrDefault(root, "closePrice", "0").replace(",", ""));
+            double change = parseDouble(getTextOrDefault(root, "compareToPreviousClosePrice", "0").replace(",", ""));
+            double changeRate = parseDouble(getTextOrDefault(root, "fluctuationsRatio", "0"));
+
+            JsonNode compareNode = root.get("compareToPreviousPrice");
+            if (compareNode != null) {
+                String dirCode = getTextOrDefault(compareNode, "code", "3");
+                // code: 1=상한가(UPPER_LIMIT), 2=상승(RISING), 3=보합, 4=하한가(LOWER_LIMIT), 5=하락(FALLING)
+                if ("4".equals(dirCode) || "5".equals(dirCode)) {
+                    change = -Math.abs(change);
+                    changeRate = -Math.abs(changeRate);
+                } else {
+                    change = Math.abs(change);
+                    changeRate = Math.abs(changeRate);
+                }
+            }
+
+            return MarketIndicatorDto.builder()
+                .id(id).name(name)
+                .currentValue(price).change(change).changeRate(changeRate)
+                .history(Collections.emptyList())
+                .build();
+
+        } catch (Exception e) {
+            log.warn("해외 지수 지표 조회 실패: symbol={}, error={}", symbol, e.getMessage());
+            return buildEmptyIndicator(id, name);
+        }
+    }
+
+    /** 네이버 증권 front-api를 통한 환율/원자재 지표 조회 */
+    private MarketIndicatorDto fetchNaverMarketIndexIndicator(String category, String reutersCode, String id, String name) {
+        try {
+            String response = naverWebClient.get()
+                .uri("https://m.stock.naver.com/front-api/marketIndex/productDetail?category=" + category + "&reutersCode=" + reutersCode)
+                .header("Referer", "https://m.stock.naver.com/")
+                .retrieve()
+                .bodyToMono(String.class)
+                .block();
+
+            if (response == null || response.isBlank()) {
+                return buildEmptyIndicator(id, name);
+            }
+
+            JsonNode root = objectMapper.readTree(response);
+            if (!root.path("isSuccess").asBoolean(false)) {
+                return buildEmptyIndicator(id, name);
+            }
+
+            JsonNode result = root.path("result");
+            String closePriceStr = result.path("closePrice").asText("0").replace(",", "");
+            double price = parseDouble(closePriceStr);
+            double change = result.path("fluctuations").asDouble(0);
+            double changeRate = result.path("fluctuationsRatio").asDouble(0);
+            List<Double> history = fetchNaverMarketIndexHistory(category, reutersCode);
+
+            return MarketIndicatorDto.builder()
+                .id(id).name(name)
+                .currentValue(price).change(change).changeRate(changeRate)
+                .history(history)
+                .build();
+
+        } catch (Exception e) {
+            log.warn("네이버 시장 지표 조회 실패: category={}, reutersCode={}, error={}", category, reutersCode, e.getMessage());
+            return buildEmptyIndicator(id, name);
+        }
+    }
+
+    /** 환율/원자재 히스토리 조회 (api.stock.naver.com/marketindex/{category}/{code}/prices) */
+    private List<Double> fetchNaverMarketIndexHistory(String category, String reutersCode) {
+        try {
+            String response = naverWebClient.get()
+                .uri("https://api.stock.naver.com/marketindex/" + category + "/" + reutersCode + "/prices?period=1M")
+                .retrieve()
+                .bodyToMono(String.class)
+                .block();
+
+            if (response == null || response.isBlank()) return Collections.emptyList();
+
+            JsonNode arr = objectMapper.readTree(response);
+            if (!arr.isArray()) return Collections.emptyList();
+
+            List<Double> history = new ArrayList<>();
+            for (JsonNode node : arr) {
+                String cp = node.path("closePrice").asText("0").replace(",", "");
+                double v = parseDouble(cp);
+                if (v > 0) history.add(v);
+            }
+            Collections.reverse(history); // 최신→과거 → 과거→최신 순으로
+            return history;
+
+        } catch (Exception e) {
+            log.debug("시장 지표 히스토리 조회 실패: category={}, reutersCode={}", category, reutersCode);
+            return Collections.emptyList();
+        }
+    }
+
+    /** 국내 지수 히스토리 조회 (siseJson 재활용) */
+    private List<Double> fetchDomesticHistory(String code) {
+        try {
+            List<CandleDto> candles = getDailyCandles(code);
+            int from = Math.max(0, candles.size() - 30);
+            return candles.subList(from, candles.size()).stream()
+                .map(CandleDto::getClose)
+                .toList();
+        } catch (Exception e) {
+            log.debug("국내 지수 히스토리 조회 실패: code={}", code);
+            return Collections.emptyList();
+        }
+    }
+
+    /** 빈 지표 DTO 생성 (API 실패 시 fallback) */
+    private MarketIndicatorDto buildEmptyIndicator(String id, String name) {
+        return MarketIndicatorDto.builder()
+            .id(id).name(name)
+            .currentValue(0).change(0).changeRate(0)
+            .history(Collections.emptyList())
+            .build();
+    }
+
     /** siseJson 응답 문자열을 파싱하여 캔들 목록으로 변환 */
     private List<CandleDto> parseSiseJsonResponse(String raw) {
         List<CandleDto> candles = new ArrayList<>();
@@ -343,10 +540,13 @@ public class NaverStockServiceImpl implements NaverStockService {
             JsonNode compareNode = root.get("compareToPreviousPrice");
             if (compareNode != null) {
                 String code = getTextOrDefault(compareNode, "code", "3");
-                // code: 1=하한가, 2=하락, 3=보합/변동없음, 4=상승, 5=상한가
-                if ("5".equals(code) || "1".equals(code)) {
+                // code: 1=상한가(UPPER_LIMIT), 2=상승(RISING), 3=보합, 4=하한가(LOWER_LIMIT), 5=하락(FALLING)
+                if ("4".equals(code) || "5".equals(code)) {
                     changeAmount = -Math.abs(changeAmount);
                     changeRate = -Math.abs(changeRate);
+                } else {
+                    changeAmount = Math.abs(changeAmount);
+                    changeRate = Math.abs(changeRate);
                 }
             }
 

@@ -1,6 +1,7 @@
 package com.example.stockchart.controller;
 
 import com.example.stockchart.dto.CandleDto;
+import com.example.stockchart.dto.MarketIndicatorDto;
 import com.example.stockchart.dto.StockPriceDto;
 import com.example.stockchart.dto.StockSearchDto;
 import com.example.stockchart.dto.WatchlistItemDto;
@@ -96,6 +97,12 @@ public class StockApiController {
         log.info("REST 종목 검색 요청: keyword={}", keyword);
         List<StockSearchDto> results = stockDataFacade.searchStock(keyword);
         return ResponseEntity.ok(results);
+    }
+
+    @GetMapping("/market-indicators")
+    public ResponseEntity<List<MarketIndicatorDto>> getMarketIndicators() {
+        log.info("REST 주요 시장 지표 요청");
+        return ResponseEntity.ok(stockDataFacade.getMarketIndicators());
     }
 
     @GetMapping("/top")
