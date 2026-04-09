@@ -53,6 +53,22 @@ function initChart(symbol) {
         });
     });
 
+    // USD/KRW 통화 토글
+    document.querySelectorAll('.currency-toggle-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            if (currentCurrency !== 'USD' || usdKrwRate <= 0) return;
+            displayCurrency = btn.dataset.cur;
+            showCurrencyToggle(displayCurrency);
+            refreshPriceDisplay();
+            if (currentData) {
+                renderCandles(currentData);
+                renderOverlays(currentData);
+                updateMAValues();
+                analyzeMA();
+            }
+        });
+    });
+
     // 이동평균선 토글
     setupCheckbox('chkMA5', function() { return ma5Series; });
     setupCheckbox('chkMA20', function() { return ma20Series; });
@@ -202,8 +218,15 @@ async function loadChartData(symbol) {
 }
 
 function renderCandles(data) {
+    var rate = getDisplayRate();
     var candles = (data.candles || []).map(function(c) {
-        return { time: dateToTimestamp(c.date), open: c.open, high: c.high, low: c.low, close: c.close };
+        return {
+            time: dateToTimestamp(c.date),
+            open:  c.open  * rate,
+            high:  c.high  * rate,
+            low:   c.low   * rate,
+            close: c.close * rate
+        };
     });
     candleSeries.setData(candles);
 
@@ -223,22 +246,24 @@ function renderVolume(data) {
 }
 
 function renderOverlays(data) {
-    setLineData(ma5Series, data.ma5, data.candles);
-    setLineData(ma20Series, data.ma20, data.candles);
-    setLineData(ma50Series, data.ma50, data.candles);
-    setLineData(ma100Series, data.ma100, data.candles);
-    setLineData(ma200Series, data.ma200, data.candles);
-    setLineData(bbUpperSeries, data.bollingerUpper, data.candles);
-    setLineData(bbMiddleSeries, data.bollingerMiddle, data.candles);
-    setLineData(bbLowerSeries, data.bollingerLower, data.candles);
+    var rate = getDisplayRate();
+    setLineData(ma5Series,      data.ma5,            data.candles, rate);
+    setLineData(ma20Series,     data.ma20,           data.candles, rate);
+    setLineData(ma50Series,     data.ma50,           data.candles, rate);
+    setLineData(ma100Series,    data.ma100,          data.candles, rate);
+    setLineData(ma200Series,    data.ma200,          data.candles, rate);
+    setLineData(bbUpperSeries,  data.bollingerUpper, data.candles, rate);
+    setLineData(bbMiddleSeries, data.bollingerMiddle,data.candles, rate);
+    setLineData(bbLowerSeries,  data.bollingerLower, data.candles, rate);
 }
 
-function setLineData(series, values, candles) {
+function setLineData(series, values, candles, rate) {
     if (!series || !values || !candles) return;
+    rate = rate || 1;
     var data = [];
     for (var i = 0; i < values.length && i < candles.length; i++) {
         if (values[i] != null) {
-            data.push({ time: dateToTimestamp(candles[i].date), value: values[i] });
+            data.push({ time: dateToTimestamp(candles[i].date), value: values[i] * rate });
         }
     }
     series.setData(data);
@@ -266,30 +291,92 @@ function syncTimeScales() {
 
 // ── 현재가 정보 ──
 
+// 종목의 원래 통화 (USD / KRW)
+var currentCurrency = 'KRW';
+// 사용자가 선택한 표시 통화 (USD 종목만 토글 가능)
+var displayCurrency = 'KRW';
+// USD/KRW 환율 (시장 지표 API에서 가져옴)
+var usdKrwRate = 0;
+// /price API 응답 캐시 (토글 시 재계산에 사용)
+var rawPriceData = null;
+
+/** USD 종목을 KRW로 보여줄 때 적용할 배율 */
+function getDisplayRate() {
+    return (currentCurrency === 'USD' && displayCurrency === 'KRW' && usdKrwRate > 0)
+        ? usdKrwRate : 1;
+}
+
+// price DTO 값 포맷 (USD: cents 단위 × 100으로 저장됨)
+function fmtPrice(rawValue) {
+    if (currentCurrency === 'USD') {
+        var usd = rawValue / 100;
+        if (displayCurrency === 'KRW' && usdKrwRate > 0)
+            return formatNumber(Math.round(usd * usdKrwRate)) + '원';
+        return '$' + usd.toFixed(2);
+    }
+    return formatNumber(rawValue) + '원';
+}
+
+function fmtChange(rawChange) {
+    if (currentCurrency === 'USD') {
+        var usd = Math.abs(rawChange / 100);
+        if (displayCurrency === 'KRW' && usdKrwRate > 0)
+            return formatNumber(Math.round(usd * usdKrwRate));
+        return '$' + usd.toFixed(2);
+    }
+    return formatNumber(Math.abs(rawChange));
+}
+
+// 캔들 OHLC 포맷 (USD 종목: 원본 달러값 double)
+function fmtCandle(value) {
+    if (currentCurrency === 'USD') {
+        if (displayCurrency === 'KRW' && usdKrwRate > 0)
+            return formatNumber(Math.round(value * usdKrwRate)) + '원';
+        return '$' + Number(value).toFixed(2);
+    }
+    return formatNumber(value) + '원';
+}
+
+/** 환율 로딩 — 전용 경량 API → 실패 시 시장 지표 API에서 추출 */
+async function fetchUsdKrwRate() {
+    try {
+        var res = await fetch('/api/stock/usdkrw-rate');
+        if (res.ok) {
+            var rate = await res.json();
+            if (rate > 0) { usdKrwRate = rate; return; }
+        }
+    } catch (e) { /* fallback 시도 */ }
+
+    try {
+        var res2 = await fetch('/api/stock/market-indicators');
+        if (res2.ok) {
+            var list = await res2.json();
+            var item = list.find(function(i) { return i.id === 'USDKRW'; });
+            if (item && item.currentValue > 0) usdKrwRate = item.currentValue;
+        }
+    } catch (e) { /* 환율 조회 완전 실패 — 토글 비활성화 */ }
+}
+
 async function loadPriceInfo(symbol) {
     try {
         var res = await fetch('/api/stock/' + symbol + '/price');
         if (!res.ok) return;
         var data = await res.json();
 
+        currentCurrency = data.currency || 'KRW';
+        displayCurrency = currentCurrency; // 초기값은 원래 통화
+        rawPriceData = data;
         document.getElementById('stockName').textContent = data.name || symbol;
 
-        var currentPriceEl = document.getElementById('infoCurrentPrice');
-        var changeEl = document.getElementById('infoPriceChange');
+        if (currentCurrency === 'USD') {
+            await fetchUsdKrwRate();
+            showCurrencyToggle(displayCurrency);
+        } else {
+            var tg = document.getElementById('currencyToggleGroup');
+            if (tg) tg.style.display = 'none';
+        }
 
-        currentPriceEl.textContent = formatNumber(data.currentPrice) + '원';
-
-        var isUp = data.priceChange > 0;
-        var isDown = data.priceChange < 0;
-        var sign = isUp ? '+' : '';
-        currentPriceEl.className = 'info-value fs-4 ' + (isUp ? 'price-up' : isDown ? 'price-down' : 'price-flat');
-        changeEl.innerHTML = '<span class="' + (isUp ? 'price-up' : isDown ? 'price-down' : 'price-flat') + '">' +
-            sign + formatNumber(data.priceChange) + ' (' + sign + (data.changeRate || 0).toFixed(2) + '%)</span>';
-
-        document.getElementById('infoOpen').textContent = formatNumber(data.open) + '원';
-        document.getElementById('infoHigh').textContent = formatNumber(data.high) + '원';
-        document.getElementById('infoLow').textContent = formatNumber(data.low) + '원';
-        document.getElementById('infoVolume').textContent = formatNumber(data.volume);
+        refreshPriceDisplay();
 
     } catch (err) {
         document.getElementById('stockName').textContent =
@@ -297,12 +384,48 @@ async function loadPriceInfo(symbol) {
     }
 }
 
+/** 토글 버튼 UI 갱신 */
+function showCurrencyToggle(activeCur) {
+    var group = document.getElementById('currencyToggleGroup');
+    if (!group) return;
+    group.style.display = '';
+    group.querySelectorAll('.currency-toggle-btn').forEach(function(btn) {
+        var isActive = btn.dataset.cur === activeCur;
+        btn.className = isActive
+            ? 'btn btn-warning btn-sm currency-toggle-btn active'
+            : 'btn btn-outline-warning btn-sm currency-toggle-btn';
+    });
+}
+
+/** 현재가 정보 패널을 현재 displayCurrency 기준으로 다시 그림 */
+function refreshPriceDisplay() {
+    if (!rawPriceData) return;
+    var data = rawPriceData;
+
+    var currentPriceEl = document.getElementById('infoCurrentPrice');
+    var changeEl = document.getElementById('infoPriceChange');
+
+    currentPriceEl.textContent = fmtPrice(data.currentPrice);
+
+    var isUp = data.priceChange > 0;
+    var isDown = data.priceChange < 0;
+    var sign = isUp ? '+' : isDown ? '-' : '';
+    currentPriceEl.className = 'info-value fs-4 ' + (isUp ? 'price-up' : isDown ? 'price-down' : 'price-flat');
+    changeEl.innerHTML = '<span class="' + (isUp ? 'price-up' : isDown ? 'price-down' : 'price-flat') + '">' +
+        sign + fmtChange(data.priceChange) + ' (' + sign + Math.abs(data.changeRate || 0).toFixed(2) + '%)</span>';
+
+    document.getElementById('infoOpen').textContent = fmtPrice(data.open);
+    document.getElementById('infoHigh').textContent = fmtPrice(data.high);
+    document.getElementById('infoLow').textContent = fmtPrice(data.low);
+    document.getElementById('infoVolume').textContent = formatNumber(data.volume);
+}
+
 function updateInfoPanel(candle) {
     if (!candle) return;
-    document.getElementById('infoOpen').textContent = formatNumber(candle.open) + '원';
-    document.getElementById('infoHigh').textContent = formatNumber(candle.high) + '원';
-    document.getElementById('infoLow').textContent = formatNumber(candle.low) + '원';
-    document.getElementById('infoClose').textContent = formatNumber(candle.close) + '원';
+    document.getElementById('infoOpen').textContent = fmtCandle(candle.open);
+    document.getElementById('infoHigh').textContent = fmtCandle(candle.high);
+    document.getElementById('infoLow').textContent = fmtCandle(candle.low);
+    document.getElementById('infoClose').textContent = fmtCandle(candle.close);
     document.getElementById('infoVolume').textContent = formatNumber(candle.volume);
 }
 
@@ -341,7 +464,7 @@ function updateMAValues() {
             var valClass = isDarkTheme() ? 'text-light' : 'text-dark';
             html += '<div class="d-flex justify-content-between align-items-center mb-1">' +
                 '<span class="small" style="color:' + ma.color + '">' + ma.name + '</span>' +
-                '<span class="small ' + valClass + '">' + formatNumber(val) + '</span>' +
+                '<span class="small ' + valClass + '">' + fmtCandle(val) + '</span>' +
                 '<span class="small ' + diffClass + '">' + diffSign + diff + '%</span></div>';
         }
     });
@@ -368,12 +491,12 @@ function analyzeMA() {
     var signals = [];
 
     if (ma50Val != null) {
-        if (price > ma50Val) signals.push({ type: 'bullish', text: '현재가가 MA50(' + formatNumber(ma50Val) + ') 위에 위치 — 단기 상승 추세' });
-        else signals.push({ type: 'bearish', text: '현재가가 MA50(' + formatNumber(ma50Val) + ') 아래 위치 — 단기 하락 추세' });
+        if (price > ma50Val) signals.push({ type: 'bullish', text: '현재가가 MA50(' + fmtCandle(ma50Val) + ') 위에 위치 — 단기 상승 추세' });
+        else signals.push({ type: 'bearish', text: '현재가가 MA50(' + fmtCandle(ma50Val) + ') 아래 위치 — 단기 하락 추세' });
     }
     if (ma200Val != null) {
-        if (price > ma200Val) signals.push({ type: 'bullish', text: '현재가가 MA200(' + formatNumber(ma200Val) + ') 위에 위치 — 장기 상승 추세' });
-        else signals.push({ type: 'bearish', text: '현재가가 MA200(' + formatNumber(ma200Val) + ') 아래 위치 — 장기 하락 추세' });
+        if (price > ma200Val) signals.push({ type: 'bullish', text: '현재가가 MA200(' + fmtCandle(ma200Val) + ') 위에 위치 — 장기 상승 추세' });
+        else signals.push({ type: 'bearish', text: '현재가가 MA200(' + fmtCandle(ma200Val) + ') 아래 위치 — 장기 하락 추세' });
     }
 
     if (ma50Val != null && ma200Val != null && last >= 5) {

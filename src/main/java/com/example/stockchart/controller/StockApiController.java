@@ -105,12 +105,24 @@ public class StockApiController {
         return ResponseEntity.ok(stockDataFacade.getMarketIndicators());
     }
 
+    @GetMapping("/usdkrw-rate")
+    public ResponseEntity<Double> getUsdKrwRate() {
+        List<MarketIndicatorDto> indicators = stockDataFacade.getMarketIndicators();
+        double rate = indicators.stream()
+            .filter(i -> "USDKRW".equals(i.getId()))
+            .mapToDouble(MarketIndicatorDto::getCurrentValue)
+            .findFirst()
+            .orElse(0.0);
+        return ResponseEntity.ok(rate);
+    }
+
     @GetMapping("/top")
     public ResponseEntity<List<StockSearchDto>> getTopByVolume(
         @RequestParam(name = "type", defaultValue = "stock") String type,
         @RequestParam(name = "limit", defaultValue = "10") int limit) {
-        if (!"stock".equalsIgnoreCase(type) && !"etf".equalsIgnoreCase(type)) {
-            throw new IllegalArgumentException("type은 stock 또는 etf만 허용됩니다.");
+        if (!"stock".equalsIgnoreCase(type) && !"etf".equalsIgnoreCase(type)
+            && !"us_stock".equalsIgnoreCase(type) && !"us_etf".equalsIgnoreCase(type)) {
+            throw new IllegalArgumentException("type은 stock, etf, us_stock, us_etf만 허용됩니다.");
         }
         if (limit < 1 || limit > 10) {
             throw new IllegalArgumentException("limit은 1~10 범위로 입력해 주세요.");

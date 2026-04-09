@@ -33,8 +33,8 @@ gradlew.bat test
 
 - **Controller**: REST API 엔드포인트(`/api/stock/**`) + Thymeleaf 뷰 라우팅
 - **StockDataFacade**: 모든 서비스 호출을 하나로 묶는 퍼사드 패턴. Controller는 이 퍼사드만 의존
-- **NaverStockServiceImpl**: 네이버 증권 API(시세, 검색, 거래량 랭킹, 분봉/일봉, 시장 지표)를 WebClient로 호출. Caffeine 캐시 적용
-- **InMemoryWatchlistService**: 관심 종목을 인메모리로 관리하고 `data/watchlist.json`에 JSON 영속화. 복합키(`symbol|group`) 기반 그룹별 분류
+- **NaverStockServiceImpl**: 네이버 증권 API(시세, 검색, 거래량 랭킹, 분봉/일봉, 시장 지표)를 WebClient로 호출. 해외 종목(6자리 숫자 아닌 심볼)은 Yahoo Finance로 라우팅(`yahooWebClient` Bean 별도 분리). Caffeine 캐시 적용
+- **InMemoryWatchlistService**: 관심 종목을 인메모리로 관리하고 `data/watchlist.json`에 JSON 영속화. 복합키(`symbol|group`) 기반 그룹별 분류. 서버 시작 시 `type` 필드 누락 항목을 종목명 패턴으로 자동 마이그레이션(ETF 판별)
 - **IndicatorUtil**: 기술적 지표 계산 유틸리티 (MA, 볼린저밴드, RSI, MACD). Controller에서 캔들 응답에 지표를 합성할 때 직접 호출
 
 ### 프론트엔드
@@ -45,7 +45,8 @@ gradlew.bat test
 
 ### 데이터 흐름
 
-- 외부 API: 네이버 증권 (시세, 차트, 검색, 랭킹), Yahoo Finance (환율/WTI — query1.finance.yahoo.com) — URL은 `application.yml`의 `naver.*` 프로퍼티
+- 외부 API: 네이버 증권 (시세, 차트, 검색, 랭킹), Yahoo Finance (환율/WTI/해외종목 일봉·분봉 — query1.finance.yahoo.com) — URL은 `application.yml`의 `naver.*` 프로퍼티
+- `StockPriceDto.currency`: KRW/USD 구분 필드. 차트 페이지에서 USD ↔ KRW 토글 지원
 - 캐시: Caffeine 인메모리 (현재가 30초, 캔들 10분, 분봉 1분, 검색 60분, 랭킹 10분, 시장 지표 5분)
 - 영속화: `data/watchlist.json` (`.gitignore`에 포함)
 
@@ -56,4 +57,4 @@ gradlew.bat test
 
 ## API 경로 규칙
 
-모든 REST API는 `/api/stock` 하위. 캔들 조회: `/{symbol}/candle?timeframe=1|3|10|day` (분봉/일봉). 시장 지표: `/market-indicators`. 관심 종목 삭제는 복합키(`symbol|group`) 또는 symbol 단독 사용.
+모든 REST API는 `/api/stock` 하위. 캔들 조회: `/{symbol}/candle?timeframe=1|3|10|day` (분봉/일봉). 시장 지표: `/market-indicators`. USD/KRW 환율: `/usdkrw-rate`. 관심 종목 삭제는 복합키(`symbol|group`) 또는 symbol 단독 사용.

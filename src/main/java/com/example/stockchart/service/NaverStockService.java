@@ -55,6 +55,15 @@ public interface NaverStockService {
     List<StockSearchDto> getTopByVolume(String type, int limit);
 
     /**
+     * 미국 인기 종목/ETF 목록 조회 (고정 리스트)
+     *
+     * @param type us_stock 또는 us_etf
+     * @param limit 최대 건수
+     * @return 미국 인기 종목 목록
+     */
+    List<StockSearchDto> getUsPopular(String type, int limit);
+
+    /**
      * 주요 시장 지표 조회 (코스피, 코스닥, 환율, WTI, S&P 500, 나스닥, 다우지수)
      *
      * @return 시장 지표 리스트 (스파크라인 히스토리 포함)

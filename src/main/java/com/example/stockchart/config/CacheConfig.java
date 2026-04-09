@@ -57,6 +57,13 @@ public class CacheConfig {
                 .maximumSize(20)
                 .build());
 
+        // 미국 인기 종목 목록 캐시: 30분 TTL (고정 리스트이므로 긴 TTL)
+        cacheManager.registerCustomCache("usPopular",
+            Caffeine.newBuilder()
+                .expireAfterWrite(30, TimeUnit.MINUTES)
+                .maximumSize(20)
+                .build());
+
         // 시장 지표 캐시: 5분 TTL (코스피/코스닥/환율/WTI/해외지수)
         cacheManager.registerCustomCache("marketIndicators",
             Caffeine.newBuilder()

@@ -39,6 +39,9 @@ public class StockDataFacade {
     }
 
     public List<StockSearchDto> getTopByVolume(String type, int limit) {
+        if ("us_stock".equalsIgnoreCase(type) || "us_etf".equalsIgnoreCase(type)) {
+            return naverStockService.getUsPopular(type, limit);
+        }
         return naverStockService.getTopByVolume(type, limit);
     }
 

@@ -97,7 +97,7 @@
                 type="button"
                 role="tab"
             >
-                <i class="bi bi-graph-up me-1"></i>주요 주식 (거래량 상위)
+                <i class="bi bi-graph-up me-1"></i>국내 주식
             </button>
         </li>
         <li class="nav-item" role="presentation">
@@ -109,7 +109,31 @@
                 type="button"
                 role="tab"
             >
-                <i class="bi bi-collection me-1"></i>주요 ETF (거래량 상위)
+                <i class="bi bi-collection me-1"></i>국내 ETF
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button
+                class="nav-link"
+                id="us-stock-tab"
+                data-bs-toggle="tab"
+                data-bs-target="#usStockPanel"
+                type="button"
+                role="tab"
+            >
+                <i class="bi bi-globe-americas me-1"></i>미국 주식
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button
+                class="nav-link"
+                id="us-etf-tab"
+                data-bs-toggle="tab"
+                data-bs-target="#usEtfPanel"
+                type="button"
+                role="tab"
+            >
+                <i class="bi bi-collection-fill me-1"></i>미국 ETF
             </button>
         </li>
         <li class="nav-item" role="presentation">
@@ -130,7 +154,7 @@
         <div class="tab-pane fade show active" id="stockPanel" role="tabpanel">
             <div class="card bg-dark border-secondary">
                 <div class="card-header border-secondary d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0"><i class="bi bi-list-ul me-2 text-warning"></i>거래량 상위 주식 10개</h5>
+                    <h5 class="mb-0"><i class="bi bi-list-ul me-2 text-warning"></i>국내 주식 거래량 상위 10개</h5>
                     <small class="text-secondary" id="stockUpdated"></small>
                 </div>
                 <div class="card-body p-0">
@@ -163,7 +187,7 @@
         <div class="tab-pane fade" id="etfPanel" role="tabpanel">
             <div class="card bg-dark border-secondary">
                 <div class="card-header border-secondary d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0"><i class="bi bi-collection me-2 text-info"></i>거래량 상위 ETF 10개</h5>
+                    <h5 class="mb-0"><i class="bi bi-collection me-2 text-info"></i>국내 ETF 거래량 상위 10개</h5>
                     <small class="text-secondary" id="etfUpdated"></small>
                 </div>
                 <div class="card-body p-0">
@@ -184,6 +208,84 @@
                             <tr>
                                 <td colspan="7" class="text-center py-4">
                                     <div class="spinner-border spinner-border-sm text-info me-2"></div>불러오는 중...
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="usStockPanel" role="tabpanel">
+            <div class="card bg-dark border-secondary">
+                <div class="card-header border-secondary d-flex justify-content-between align-items-center">
+                    <div class="d-flex align-items-center gap-3">
+                        <h5 class="mb-0"><i class="bi bi-globe-americas me-2 text-success"></i>미국 주식 인기 종목 10개</h5>
+                        <div class="btn-group btn-group-sm" role="group" id="usStockCurrencyToggle">
+                            <button class="btn btn-warning us-currency-btn active" data-table="usStock" data-cur="USD">$ USD</button>
+                            <button class="btn btn-outline-warning us-currency-btn" data-table="usStock" data-cur="KRW">₩ 원화</button>
+                        </div>
+                    </div>
+                    <small class="text-secondary" id="usStockUpdated"></small>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-dark table-hover mb-0">
+                            <thead>
+                            <tr class="text-secondary border-secondary">
+                                <th>종목명</th>
+                                <th>코드</th>
+                                <th class="text-end">현재가</th>
+                                <th class="text-end">전일대비</th>
+                                <th class="text-end">등락률</th>
+                                <th class="text-end">거래량</th>
+                                <th class="text-center">동작</th>
+                            </tr>
+                            </thead>
+                            <tbody id="usStockTableBody">
+                            <tr>
+                                <td colspan="7" class="text-center py-4">
+                                    <div class="spinner-border spinner-border-sm text-success me-2"></div>불러오는 중...
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="usEtfPanel" role="tabpanel">
+            <div class="card bg-dark border-secondary">
+                <div class="card-header border-secondary d-flex justify-content-between align-items-center">
+                    <div class="d-flex align-items-center gap-3">
+                        <h5 class="mb-0"><i class="bi bi-collection-fill me-2 text-primary"></i>미국 ETF 인기 종목 10개</h5>
+                        <div class="btn-group btn-group-sm" role="group" id="usEtfCurrencyToggle">
+                            <button class="btn btn-warning us-currency-btn active" data-table="usEtf" data-cur="USD">$ USD</button>
+                            <button class="btn btn-outline-warning us-currency-btn" data-cur="KRW" data-table="usEtf">₩ 원화</button>
+                        </div>
+                    </div>
+                    <small class="text-secondary" id="usEtfUpdated"></small>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-dark table-hover mb-0">
+                            <thead>
+                            <tr class="text-secondary border-secondary">
+                                <th>ETF명</th>
+                                <th>코드</th>
+                                <th class="text-end">현재가</th>
+                                <th class="text-end">전일대비</th>
+                                <th class="text-end">등락률</th>
+                                <th class="text-end">거래량</th>
+                                <th class="text-center">동작</th>
+                            </tr>
+                            </thead>
+                            <tbody id="usEtfTableBody">
+                            <tr>
+                                <td colspan="7" class="text-center py-4">
+                                    <div class="spinner-border spinner-border-sm text-primary me-2"></div>불러오는 중...
                                 </td>
                             </tr>
                             </tbody>
@@ -315,6 +417,11 @@
             const res = await fetch('/api/stock/market-indicators');
             if (!res.ok) throw new Error('시장 지표 조회 실패');
             const indicators = await res.json();
+            // USD/KRW 환율 추출하여 저장
+            const usdKrwItem = indicators.find(i => i.id === 'USDKRW');
+            if (usdKrwItem && usdKrwItem.currentValue > 0) {
+                usdKrwRate = usdKrwItem.currentValue;
+            }
             renderMarketIndicators(indicators);
         } catch (e) {
             document.getElementById('marketIndicatorList').innerHTML =
@@ -435,6 +542,13 @@
     let groupList = [];
     let groupSelectorTarget = null; // 관심추가 시 그룹 선택 대상
     let dragSrcGroup = null;
+
+    // 미국 주식 USD/KRW 토글 상태
+    let usdKrwRate = 0;
+    let usStockDisplayCurrency = 'USD';
+    let usEtfDisplayCurrency = 'USD';
+    let usStockPriceCache = []; // {item, price} 배열
+    let usEtfPriceCache = [];   // {item, price} 배열
 
     function loadGroupOrder() {
         try {
@@ -690,20 +804,95 @@
         tbody.innerHTML = rows.join('');
     }
 
-    function buildTopRow(price, item) {
+    async function loadUsTable(type, tbodyId, updatedId, priceCacheRef) {
+        const tbody = document.getElementById(tbodyId);
+        try {
+            const items = await fetchTopList(type);
+            if (!items || items.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-secondary">데이터가 없습니다.</td></tr>';
+                return;
+            }
+
+            const priceResults = await Promise.allSettled(items.map(item => fetchPrice(item.symbol)));
+            priceCacheRef.length = 0;
+            priceResults.forEach((result, idx) => {
+                const item = items[idx];
+                const price = result.status === 'fulfilled' ? result.value : null;
+                priceCacheRef.push({ item, price });
+            });
+
+            renderUsTable(priceCacheRef, tbody, type.startsWith('us_etf') ? usEtfDisplayCurrency : usStockDisplayCurrency);
+            document.getElementById(updatedId).textContent =
+                '업데이트: ' + new Date().toLocaleTimeString('ko-KR');
+        } catch (e) {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-danger">목록을 불러오지 못했습니다.</td></tr>';
+        }
+    }
+
+    function renderUsTable(cache, tbody, displayCurrency) {
+        if (!cache || cache.length === 0) return;
+        const rows = cache.map(r =>
+            r.price ? buildUsRow(r.price, r.item, displayCurrency) : buildTopErrorRow(r.item)
+        );
+        tbody.innerHTML = rows.join('');
+    }
+
+    function buildUsRow(price, item, displayCurrency) {
         const isUp = price.priceChange > 0;
         const isDown = price.priceChange < 0;
         const colorClass = isUp ? 'price-up' : (isDown ? 'price-down' : 'price-flat');
-        const sign = isUp ? '+' : '';
+        const sign = isUp ? '+' : isDown ? '-' : '';
         const icon = isUp ? '&#9650;' : (isDown ? '&#9660;' : '&#9472;');
         const watchBtn = buildWatchButton(item);
+
+        const priceCell = fmtUsPriceCell(price.currentPrice, displayCurrency);
+        const changeCell = fmtUsChangeCell(price.priceChange, displayCurrency);
 
         return '<tr>' +
             '<td class="fw-semibold">' + escHtml(price.name || item.name) + '</td>' +
             '<td class="text-secondary font-monospace">' + escHtml(price.symbol) + '</td>' +
-            '<td class="text-end fw-bold">' + formatNumber(price.currentPrice) + '원</td>' +
-            '<td class="text-end ' + colorClass + '">' + icon + ' ' + sign + formatNumber(price.priceChange) + '</td>' +
-            '<td class="text-end ' + colorClass + '">' + sign + Number(price.changeRate || 0).toFixed(2) + '%</td>' +
+            '<td class="text-end fw-bold">' + priceCell + '</td>' +
+            '<td class="text-end ' + colorClass + '">' + icon + ' ' + sign + changeCell + '</td>' +
+            '<td class="text-end ' + colorClass + '">' + icon + ' ' + sign + Math.abs(Number(price.changeRate || 0)).toFixed(2) + '%</td>' +
+            '<td class="text-end text-secondary">' + formatNumber(price.volume) + '</td>' +
+            '<td class="text-center">' +
+            '<a href="/chart/' + escHtml(price.symbol) + '" class="btn btn-sm btn-outline-warning me-1">차트</a>' +
+            watchBtn +
+            '</td>' +
+            '</tr>';
+    }
+
+    function fmtUsPriceCell(rawValue, displayCurrency) {
+        const usd = rawValue / 100;
+        if (displayCurrency === 'KRW' && usdKrwRate > 0) {
+            return formatNumber(Math.round(usd * usdKrwRate)) + '원';
+        }
+        return '$' + usd.toFixed(2);
+    }
+
+    function fmtUsChangeCell(rawChange, displayCurrency) {
+        const usd = Math.abs(rawChange / 100);
+        if (displayCurrency === 'KRW' && usdKrwRate > 0) {
+            return formatNumber(Math.round(usd * usdKrwRate));
+        }
+        return '$' + usd.toFixed(2);
+    }
+
+    function buildTopRow(price, item) {
+        const isUp = price.priceChange > 0;
+        const isDown = price.priceChange < 0;
+        const colorClass = isUp ? 'price-up' : (isDown ? 'price-down' : 'price-flat');
+        const sign = isUp ? '+' : isDown ? '-' : '';
+        const icon = isUp ? '&#9650;' : (isDown ? '&#9660;' : '&#9472;');
+        const watchBtn = buildWatchButton(item);
+        const cur = price.currency || 'KRW';
+
+        return '<tr>' +
+            '<td class="fw-semibold">' + escHtml(price.name || item.name) + '</td>' +
+            '<td class="text-secondary font-monospace">' + escHtml(price.symbol) + '</td>' +
+            '<td class="text-end fw-bold">' + fmtPriceCell(price.currentPrice, cur) + '</td>' +
+            '<td class="text-end ' + colorClass + '">' + icon + ' ' + sign + fmtChangeCell(price.priceChange, cur) + '</td>' +
+            '<td class="text-end ' + colorClass + '">' + icon + ' ' + sign + Math.abs(Number(price.changeRate || 0)).toFixed(2) + '%</td>' +
             '<td class="text-end text-secondary">' + formatNumber(price.volume) + '</td>' +
             '<td class="text-center">' +
             '<a href="/chart/' + escHtml(price.symbol) + '" class="btn btn-sm btn-outline-warning me-1">차트</a>' +
@@ -744,8 +933,9 @@
         const isUp = price.priceChange > 0;
         const isDown = price.priceChange < 0;
         const colorClass = isUp ? 'price-up' : (isDown ? 'price-down' : 'price-flat');
-        const sign = isUp ? '+' : '';
+        const sign = isUp ? '+' : isDown ? '-' : '';
         const icon = isUp ? '&#9650;' : (isDown ? '&#9660;' : '&#9472;');
+        const cur = price.currency || 'KRW';
 
         const isAllView = currentGroupFilter === '__all__';
         const groupCell = isAllView
@@ -761,8 +951,8 @@
             '<td><span class="badge ' + (item.type === 'etf' ? 'bg-info' : 'bg-secondary') + '">' +
             escHtml(item.type === 'etf' ? 'ETF' : '주식') + '</span></td>' +
             groupCell +
-            '<td class="text-end fw-bold">' + formatNumber(price.currentPrice) + '원</td>' +
-            '<td class="text-end ' + colorClass + '">' + sign + Number(price.changeRate || 0).toFixed(2) + '%</td>' +
+            '<td class="text-end fw-bold">' + fmtPriceCell(price.currentPrice, cur) + '</td>' +
+            '<td class="text-end ' + colorClass + '">' + icon + ' ' + sign + Math.abs(Number(price.changeRate || 0)).toFixed(2) + '%</td>' +
             '<td class="text-end text-secondary">' + formatNumber(price.volume) + '</td>' +
             '<td class="text-center">' +
             '<a href="/chart/' + escHtml(item.symbol) + '" class="btn btn-sm btn-outline-warning me-1">차트</a>' +
@@ -874,6 +1064,33 @@
     }
 
     function bindEvents() {
+        // 미국 주식/ETF USD/KRW 토글
+        document.addEventListener('click', function(e) {
+            const btn = e.target.closest('.us-currency-btn');
+            if (!btn) return;
+
+            const tableKey = btn.dataset.table;
+            const cur = btn.dataset.cur;
+
+            // 버튼 그룹 UI 갱신
+            const group = btn.closest('.btn-group');
+            if (group) {
+                group.querySelectorAll('.us-currency-btn').forEach(b => {
+                    b.classList.toggle('btn-warning', b.dataset.cur === cur);
+                    b.classList.toggle('btn-outline-warning', b.dataset.cur !== cur);
+                    b.classList.toggle('active', b.dataset.cur === cur);
+                });
+            }
+
+            if (tableKey === 'usStock') {
+                usStockDisplayCurrency = cur;
+                renderUsTable(usStockPriceCache, document.getElementById('usStockTableBody'), cur);
+            } else if (tableKey === 'usEtf') {
+                usEtfDisplayCurrency = cur;
+                renderUsTable(usEtfPriceCache, document.getElementById('usEtfTableBody'), cur);
+            }
+        });
+
         searchInputEl.addEventListener('input', function () {
             clearTimeout(searchDebounceTimer);
             const keyword = this.value.trim();
@@ -1119,6 +1336,19 @@
         return Number(n).toLocaleString('ko-KR');
     }
 
+    function fmtPriceCell(rawValue, currency) {
+        const badge = currency === 'USD'
+            ? '<span class="badge bg-warning text-dark ms-1" style="font-size:0.65rem;vertical-align:middle">USD</span>'
+            : '<span class="badge bg-primary ms-1" style="font-size:0.65rem;vertical-align:middle">KRW</span>';
+        if (currency === 'USD') return '$' + (rawValue / 100).toFixed(2) + badge;
+        return formatNumber(rawValue) + '원' + badge;
+    }
+
+    function fmtChangeCell(rawChange, currency) {
+        if (currency === 'USD') return '$' + Math.abs(rawChange / 100).toFixed(2);
+        return formatNumber(Math.abs(rawChange));
+    }
+
     function escHtml(str) {
         return String(str)
             .replace(/&/g, '&amp;')
@@ -1161,6 +1391,8 @@
             loadMarketIndicators(),
             loadTopTable('stock', 'stockTableBody', 'stockUpdated'),
             loadTopTable('etf', 'etfTableBody', 'etfUpdated'),
+            loadUsTable('us_stock', 'usStockTableBody', 'usStockUpdated', usStockPriceCache),
+            loadUsTable('us_etf', 'usEtfTableBody', 'usEtfUpdated', usEtfPriceCache),
             refreshWatchlist(),
         ]);
         startCountdown();
@@ -1168,11 +1400,13 @@
 
     async function initialize() {
         bindEvents();
-        loadMarketIndicators(); // 시장 지표는 독립적으로 먼저 로드
+        await loadMarketIndicators(); // 환율 먼저 로드 (USD/KRW 변환에 필요)
         await refreshWatchlist();
         await Promise.all([
             loadTopTable('stock', 'stockTableBody', 'stockUpdated'),
             loadTopTable('etf', 'etfTableBody', 'etfUpdated'),
+            loadUsTable('us_stock', 'usStockTableBody', 'usStockUpdated', usStockPriceCache),
+            loadUsTable('us_etf', 'usEtfTableBody', 'usEtfUpdated', usEtfPriceCache),
         ]);
         startCountdown();
     }

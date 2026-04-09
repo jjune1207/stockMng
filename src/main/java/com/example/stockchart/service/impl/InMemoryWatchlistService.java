@@ -17,6 +17,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -26,6 +27,12 @@ public class InMemoryWatchlistService implements WatchlistService {
     private static final int MAX_WATCHLIST_SIZE = 100;
     private static final String DATA_DIR = "data";
     private static final String WATCHLIST_FILE = "watchlist.json";
+
+    /** ETF 종목명 패턴 — type 필드 없는 기존 데이터 마이그레이션용 */
+    private static final Pattern ETF_NAME_PATTERN = Pattern.compile(
+        "(KODEX|TIGER|KOSEF|ARIRANG|ACE|RISE|SOL|HANARO|KBSTAR|ETF|ETN|INVERS|LEVERAGE)",
+        Pattern.CASE_INSENSITIVE
+    );
 
     /** 복합키: symbol|group → 같은 종목을 여러 그룹에 등록 가능 */
     private final Map<String, WatchlistItemDto> watchlist = new ConcurrentHashMap<>();
@@ -50,12 +57,24 @@ public class InMemoryWatchlistService implements WatchlistService {
         try {
             byte[] bytes = Files.readAllBytes(filePath);
             List<WatchlistItemDto> items = objectMapper.readValue(bytes, new TypeReference<>() {});
-            items.forEach(item -> {
+            boolean needsMigration = false;
+            for (WatchlistItemDto item : items) {
                 String group = (item.getGroup() == null || item.getGroup().isBlank()) ? "" : item.getGroup();
                 item.setGroup(group);
+                // type 필드 없는 기존 데이터 마이그레이션: 종목명으로 ETF 여부 추론
+                if (item.getType() == null || item.getType().isBlank()) {
+                    String name = item.getName() != null ? item.getName() : "";
+                    boolean isEtf = ETF_NAME_PATTERN.matcher(name).find();
+                    item.setType(isEtf ? "etf" : "stock");
+                    needsMigration = true;
+                }
                 watchlist.put(compositeKey(item.getSymbol(), group), item);
-            });
+            }
             log.info("관심 종목 {}개 로드 완료: {}", watchlist.size(), filePath.toAbsolutePath());
+            if (needsMigration) {
+                saveToFile();
+                log.info("관심 종목 type 필드 마이그레이션 완료");
+            }
         } catch (IOException e) {
             log.error("관심 종목 파일 로드 실패: {}", e.getMessage());
         }
@@ -96,7 +115,7 @@ public class InMemoryWatchlistService implements WatchlistService {
             throw new IllegalArgumentException("관심 종목 코드는 필수입니다.");
         }
         String normalizedSymbol = item.getSymbol().trim();
-        if (!normalizedSymbol.matches("^[A-Za-z0-9]{4,12}$")) {
+        if (!normalizedSymbol.matches("^[A-Za-z0-9]{1,12}$")) {
             throw new IllegalArgumentException("올바른 종목 코드 형식이 아닙니다.");
         }
         String group = (item.getGroup() == null || item.getGroup().isBlank()) ? "" : item.getGroup().trim();

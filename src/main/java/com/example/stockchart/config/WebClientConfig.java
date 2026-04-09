@@ -32,4 +32,22 @@ public class WebClientConfig {
             .codecs(config -> config.defaultCodecs().maxInMemorySize(4 * 1024 * 1024))
             .build();
     }
+
+    @Bean("yahooWebClient")
+    public WebClient yahooWebClient() {
+        HttpClient httpClient = HttpClient.create()
+            .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 5_000)
+            .responseTimeout(Duration.ofSeconds(10))
+            .doOnConnected(conn ->
+                conn.addHandlerLast(new ReadTimeoutHandler(10, TimeUnit.SECONDS))
+            );
+
+        return WebClient.builder()
+            .clientConnector(new ReactorClientHttpConnector(httpClient))
+            .defaultHeader("User-Agent",
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+                "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+            .codecs(config -> config.defaultCodecs().maxInMemorySize(8 * 1024 * 1024))
+            .build();
+    }
 }

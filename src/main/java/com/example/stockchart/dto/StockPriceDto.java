@@ -40,4 +40,8 @@ public class StockPriceDto {
 
     /** 시가 */
     private long open;
+
+    /** 통화 (KRW: 한국, USD: 미국) */
+    @Builder.Default
+    private String currency = "KRW";
 }

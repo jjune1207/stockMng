@@ -8,7 +8,6 @@ import com.example.stockchart.exception.StockApiException;
 import com.example.stockchart.service.NaverStockService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,7 +18,10 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -32,13 +34,20 @@ import java.util.regex.Pattern;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class NaverStockServiceImpl implements NaverStockService {
 
-    @Qualifier("naverWebClient")
     private final WebClient naverWebClient;
-
+    private final WebClient yahooWebClient;
     private final ObjectMapper objectMapper;
+
+    public NaverStockServiceImpl(
+            @Qualifier("naverWebClient") WebClient naverWebClient,
+            @Qualifier("yahooWebClient") WebClient yahooWebClient,
+            ObjectMapper objectMapper) {
+        this.naverWebClient = naverWebClient;
+        this.yahooWebClient = yahooWebClient;
+        this.objectMapper = objectMapper;
+    }
 
     @Value("${naver.stock-basic-url}")
     private String stockBasicUrl;
@@ -61,9 +70,18 @@ public class NaverStockServiceImpl implements NaverStockService {
         "\\[\"(\\d{8})\"\\s*,\\s*([\\d.]+)\\s*,\\s*([\\d.]+)\\s*,\\s*([\\d.]+)\\s*,\\s*([\\d.]+)\\s*,\\s*([\\d.]+)"
     );
 
+    /** 해외 종목 여부 판단 (국내 종목: 6자리 숫자) */
+    private boolean isOverseasSymbol(String symbol) {
+        return symbol != null && !symbol.matches("^[0-9]{6}$");
+    }
+
     @Override
     @Cacheable(value = "stockCandle", key = "#p0")
     public List<CandleDto> getDailyCandles(String symbol) {
+        if (isOverseasSymbol(symbol)) {
+            log.info("해외 종목 일봉 조회 (Yahoo Finance): symbol={}", symbol);
+            return fetchYahooDailyCandles(symbol);
+        }
         log.info("일봉 캔들 데이터 조회 시작: symbol={}", symbol);
 
         String endTime = LocalDate.now().format(DATE_FMT);
@@ -113,6 +131,12 @@ public class NaverStockServiceImpl implements NaverStockService {
     @Override
     @Cacheable(value = "stockMinuteCandle", key = "#p0 + '_' + #p1")
     public List<CandleDto> getMinuteCandles(String symbol, int intervalMinutes) {
+        if (isOverseasSymbol(symbol)) {
+            log.info("해외 종목 분봉 조회 (Yahoo Finance): symbol={}, interval={}분", symbol, intervalMinutes);
+            List<CandleDto> raw = fetchYahooMinuteCandles1M(symbol);
+            if (intervalMinutes <= 1) return raw;
+            return aggregateMinuteCandles(raw, intervalMinutes);
+        }
         log.info("분봉 캔들 데이터 조회 시작: symbol={}, interval={}분", symbol, intervalMinutes);
 
         // 최근 5일치 데이터를 가져오기 위해 startDateTime 설정
@@ -231,6 +255,13 @@ public class NaverStockServiceImpl implements NaverStockService {
     public StockPriceDto getCurrentPrice(String symbol) {
         log.info("현재가 정보 조회 시작: symbol={}", symbol);
 
+        if (isOverseasSymbol(symbol)) {
+            log.info("해외 종목 현재가 조회 (Yahoo Finance): symbol={}", symbol);
+            StockPriceDto price = fetchYahooCurrentPrice(symbol);
+            if (price != null) return price;
+            throw new StockApiException("해외 종목 현재가 조회 실패: " + symbol, 404);
+        }
+
         try {
             // 주식(stock) API 시도
             StockPriceDto price = fetchBasicInfo(symbol, stockBasicUrl + "/" + symbol + "/basic");
@@ -302,6 +333,50 @@ public class NaverStockServiceImpl implements NaverStockService {
     }
 
     @Override
+    @Cacheable(value = "usPopular", key = "#p0 + ':' + #p1")
+    public List<StockSearchDto> getUsPopular(String type, int limit) {
+        int safeLimit = Math.min(Math.max(limit, 1), 10);
+        boolean isEtf = "us_etf".equalsIgnoreCase(type);
+
+        List<String[]> list = isEtf
+            ? List.of(
+                new String[]{"SPY",  "SPDR S&P 500 ETF Trust"},
+                new String[]{"QQQ",  "Invesco QQQ Trust"},
+                new String[]{"TQQQ", "ProShares UltraPro QQQ"},
+                new String[]{"SQQQ", "ProShares UltraPro Short QQQ"},
+                new String[]{"SOXL", "Direxion Daily Semiconductor Bull 3X"},
+                new String[]{"SOXS", "Direxion Daily Semiconductor Bear 3X"},
+                new String[]{"IWM",  "iShares Russell 2000 ETF"},
+                new String[]{"GLD",  "SPDR Gold Shares"},
+                new String[]{"TLT",  "iShares 20+ Year Treasury Bond ETF"},
+                new String[]{"VTI",  "Vanguard Total Stock Market ETF"}
+            )
+            : List.of(
+                new String[]{"NVDA",  "NVIDIA Corporation"},
+                new String[]{"TSLA",  "Tesla Inc"},
+                new String[]{"AAPL",  "Apple Inc"},
+                new String[]{"AMZN",  "Amazon.com Inc"},
+                new String[]{"AMD",   "Advanced Micro Devices"},
+                new String[]{"META",  "Meta Platforms Inc"},
+                new String[]{"MSFT",  "Microsoft Corporation"},
+                new String[]{"PLTR",  "Palantir Technologies"},
+                new String[]{"GOOGL", "Alphabet Inc"},
+                new String[]{"NFLX",  "Netflix Inc"}
+            );
+
+        String normalizedType = isEtf ? "etf" : "stock";
+        return list.stream()
+            .limit(safeLimit)
+            .map(arr -> StockSearchDto.builder()
+                .symbol(arr[0])
+                .name(arr[1])
+                .market("NASDAQ")
+                .type(normalizedType)
+                .build())
+            .toList();
+    }
+
+    @Override
     @Cacheable(value = "marketIndicators", key = "'all'")
     public List<MarketIndicatorDto> getMarketIndicators() {
         log.info("주요 시장 지표 조회 시작");
@@ -311,9 +386,9 @@ public class NaverStockServiceImpl implements NaverStockService {
         result.add(fetchDomesticIndexIndicator("KOSDAQ", "KOSDAQ", "코스닥"));
         result.add(fetchNaverMarketIndexIndicator("exchange", "FX_USDKRW", "USDKRW", "환율 (USD/KRW)"));
         result.add(fetchNaverMarketIndexIndicator("energy", "CLcv1", "WTI", "WTI 유가"));
-        result.add(fetchNaverForeignIndexIndicator(".INX", "SP500", "S&P 500"));
-        result.add(fetchNaverForeignIndexIndicator(".IXIC", "NASDAQ", "나스닥"));
-        result.add(fetchNaverForeignIndexIndicator(".DJI", "DJI", "다우지수"));
+        result.add(fetchNaverForeignIndexIndicator(".INX", "SP500", "S&P 500", "^GSPC"));
+        result.add(fetchNaverForeignIndexIndicator(".IXIC", "NASDAQ", "나스닥", "^IXIC"));
+        result.add(fetchNaverForeignIndexIndicator(".DJI", "DJI", "다우지수", "^DJI"));
 
         return result.stream().filter(Objects::nonNull).toList();
     }
@@ -363,8 +438,8 @@ public class NaverStockServiceImpl implements NaverStockService {
         }
     }
 
-    /** 해외 지수 (S&P 500: .INX, 나스닥: .IXIC, 다우: .DJI) 지표 조회 */
-    private MarketIndicatorDto fetchNaverForeignIndexIndicator(String symbol, String id, String name) {
+    /** 해외 지수 (S&P 500: .INX, 나스닥: .IXIC, 다우: .DJI) 지표 조회 + Yahoo Finance 히스토리 */
+    private MarketIndicatorDto fetchNaverForeignIndexIndicator(String symbol, String id, String name, String yahooSymbol) {
         try {
             String response = naverWebClient.get()
                 .uri("https://api.stock.naver.com/index/" + symbol + "/basic")
@@ -384,7 +459,6 @@ public class NaverStockServiceImpl implements NaverStockService {
             JsonNode compareNode = root.get("compareToPreviousPrice");
             if (compareNode != null) {
                 String dirCode = getTextOrDefault(compareNode, "code", "3");
-                // code: 1=상한가(UPPER_LIMIT), 2=상승(RISING), 3=보합, 4=하한가(LOWER_LIMIT), 5=하락(FALLING)
                 if ("4".equals(dirCode) || "5".equals(dirCode)) {
                     change = -Math.abs(change);
                     changeRate = -Math.abs(changeRate);
@@ -394,15 +468,53 @@ public class NaverStockServiceImpl implements NaverStockService {
                 }
             }
 
+            List<Double> history = fetchYahooIndexHistory(yahooSymbol);
+
             return MarketIndicatorDto.builder()
                 .id(id).name(name)
                 .currentValue(price).change(change).changeRate(changeRate)
-                .history(Collections.emptyList())
+                .history(history)
                 .build();
 
         } catch (Exception e) {
             log.warn("해외 지수 지표 조회 실패: symbol={}, error={}", symbol, e.getMessage());
             return buildEmptyIndicator(id, name);
+        }
+    }
+
+    /** Yahoo Finance 지수 히스토리 조회 (스파크라인용, 30일치) */
+    private List<Double> fetchYahooIndexHistory(String yahooSymbol) {
+        try {
+            String response = yahooWebClient.get()
+                .uri(uriBuilder -> uriBuilder
+                    .scheme("https")
+                    .host("query1.finance.yahoo.com")
+                    .path("/v8/finance/chart/{symbol}")
+                    .queryParam("interval", "1d")
+                    .queryParam("range", "2mo")
+                    .build(yahooSymbol))
+                .retrieve()
+                .bodyToMono(String.class)
+                .block();
+
+            if (response == null || response.isBlank()) return Collections.emptyList();
+
+            JsonNode root = objectMapper.readTree(response);
+            JsonNode result = root.path("chart").path("result");
+            if (!result.isArray() || result.isEmpty()) return Collections.emptyList();
+
+            JsonNode closes = result.get(0).path("indicators").path("quote").get(0).path("close");
+            if (!closes.isArray()) return Collections.emptyList();
+
+            List<Double> history = new ArrayList<>();
+            for (JsonNode node : closes) {
+                if (!node.isNull()) history.add(node.asDouble());
+            }
+            return history;
+
+        } catch (Exception e) {
+            log.debug("Yahoo 지수 히스토리 조회 실패: symbol={}, error={}", yahooSymbol, e.getMessage());
+            return Collections.emptyList();
         }
     }
 
@@ -473,16 +585,37 @@ public class NaverStockServiceImpl implements NaverStockService {
         }
     }
 
-    /** 국내 지수 히스토리 조회 (siseJson 재활용) */
+    /** 국내 지수 히스토리 조회 — fchart siseJson 직접 호출 (getDailyCandles는 isOverseasSymbol 라우팅이 있어 사용 불가) */
     private List<Double> fetchDomesticHistory(String code) {
         try {
-            List<CandleDto> candles = getDailyCandles(code);
+            String endTime = LocalDate.now().format(DATE_FMT);
+            String startTime = LocalDate.now().minusMonths(2).format(DATE_FMT);
+
+            String raw = naverWebClient.get()
+                .uri(uriBuilder -> uriBuilder
+                    .scheme("https")
+                    .host("fchart.stock.naver.com")
+                    .path("/siseJson.nhn")
+                    .queryParam("symbol", code)
+                    .queryParam("requestType", "1")
+                    .queryParam("startTime", startTime)
+                    .queryParam("endTime", endTime)
+                    .queryParam("timeframe", "day")
+                    .build())
+                .retrieve()
+                .bodyToMono(String.class)
+                .block();
+
+            if (raw == null || raw.isBlank()) return Collections.emptyList();
+
+            List<CandleDto> candles = parseSiseJsonResponse(raw);
+            candles.sort((a, b) -> a.getDate().compareTo(b.getDate()));
             int from = Math.max(0, candles.size() - 30);
             return candles.subList(from, candles.size()).stream()
                 .map(CandleDto::getClose)
                 .toList();
         } catch (Exception e) {
-            log.debug("국내 지수 히스토리 조회 실패: code={}", code);
+            log.debug("국내 지수 히스토리 조회 실패: code={}, error={}", code, e.getMessage());
             return Collections.emptyList();
         }
     }
@@ -850,6 +983,210 @@ public class NaverStockServiceImpl implements NaverStockService {
             return (long) Double.parseDouble(value.replace(",", "").trim());
         } catch (NumberFormatException e) {
             return 0L;
+        }
+    }
+
+    // ── Yahoo Finance 해외 종목 조회 ──────────────────────────────────────
+
+    /** Yahoo Finance에서 해외 종목 현재가 조회 */
+    private StockPriceDto fetchYahooCurrentPrice(String symbol) {
+        try {
+            String response = yahooWebClient.get()
+                .uri(uriBuilder -> uriBuilder
+                    .scheme("https")
+                    .host("query1.finance.yahoo.com")
+                    .path("/v8/finance/chart/{symbol}")
+                    .queryParam("interval", "1d")
+                    .queryParam("range", "1d")
+                    .build(symbol))
+                .retrieve()
+                .bodyToMono(String.class)
+                .block();
+
+            if (response == null || response.isBlank()) return null;
+
+            JsonNode root = objectMapper.readTree(response);
+            JsonNode result = root.path("chart").path("result");
+            if (!result.isArray() || result.isEmpty()) return null;
+
+            JsonNode resultNode = result.get(0);
+            JsonNode meta = resultNode.path("meta");
+            double price    = meta.path("regularMarketPrice").asDouble(0);
+            double change   = meta.path("regularMarketChange").asDouble(0);
+            double rate     = meta.path("regularMarketChangePercent").asDouble(0);
+            long   volume   = meta.path("regularMarketVolume").asLong(0);
+
+            // meta의 Day 필드는 장 마감 후 모두 동일한 값으로 반환되는 문제가 있음
+            // indicators.quote (실제 캔들 데이터)에서 OHLCV 추출해 우선 사용
+            double high = meta.path("regularMarketDayHigh").asDouble(0);
+            double low  = meta.path("regularMarketDayLow").asDouble(0);
+            double open = meta.path("regularMarketOpen").asDouble(0);
+
+            JsonNode quoteArr = resultNode.path("indicators").path("quote");
+            if (!quoteArr.isEmpty()) {
+                JsonNode quote = quoteArr.get(0);
+                double candleHigh = lastValidDouble(quote.path("high"));
+                double candleLow  = lastValidDouble(quote.path("low"));
+                double candleOpen = firstValidDouble(quote.path("open"));
+                if (candleHigh > 0) high = candleHigh;
+                if (candleLow  > 0) low  = candleLow;
+                if (candleOpen > 0) open = candleOpen;
+            }
+
+            // 장 외 시간에 change/rate가 0으로 오는 경우 previousClose로 직접 계산
+            if ((change == 0 || rate == 0) && price > 0) {
+                double prevClose = meta.path("chartPreviousClose").asDouble(0);
+                if (prevClose <= 0) prevClose = meta.path("previousClose").asDouble(0);
+                if (prevClose > 0) {
+                    change = price - prevClose;
+                    rate   = (change / prevClose) * 100.0;
+                }
+            }
+
+            String name = meta.path("longName").asText("");
+            if (name.isBlank()) name = meta.path("shortName").asText(symbol);
+
+            return StockPriceDto.builder()
+                .symbol(symbol)
+                .name(name)
+                .currentPrice(Math.round(price * 100))
+                .priceChange(Math.round(change * 100))
+                .changeRate(Math.round(rate * 100.0) / 100.0)
+                .high(Math.round(high * 100))
+                .low(Math.round(low * 100))
+                .open(Math.round(open * 100))
+                .volume(volume)
+                .currency("USD")
+                .build();
+
+        } catch (Exception e) {
+            log.error("Yahoo 현재가 조회 실패: symbol={}, {}", symbol, e.getMessage());
+            return null;
+        }
+    }
+
+    /** JsonNode 배열에서 마지막으로 유효한(non-null, non-NaN) double 값 반환 */
+    private double lastValidDouble(JsonNode arr) {
+        if (arr == null || !arr.isArray()) return 0;
+        double result = 0;
+        for (JsonNode node : arr) {
+            if (!node.isNull() && node.isNumber()) {
+                double v = node.asDouble();
+                if (!Double.isNaN(v) && v > 0) result = v;
+            }
+        }
+        return result;
+    }
+
+    /** JsonNode 배열에서 첫 번째로 유효한(non-null, non-NaN) double 값 반환 */
+    private double firstValidDouble(JsonNode arr) {
+        if (arr == null || !arr.isArray()) return 0;
+        for (JsonNode node : arr) {
+            if (!node.isNull() && node.isNumber()) {
+                double v = node.asDouble();
+                if (!Double.isNaN(v) && v > 0) return v;
+            }
+        }
+        return 0;
+    }
+
+    /** Yahoo Finance에서 해외 종목 일봉 조회 */
+    private List<CandleDto> fetchYahooDailyCandles(String symbol) {
+        try {
+            String response = yahooWebClient.get()
+                .uri(uriBuilder -> uriBuilder
+                    .scheme("https")
+                    .host("query1.finance.yahoo.com")
+                    .path("/v8/finance/chart/{symbol}")
+                    .queryParam("interval", "1d")
+                    .queryParam("range", "3y")
+                    .build(symbol))
+                .retrieve()
+                .bodyToMono(String.class)
+                .block();
+
+            return parseYahooCandleResponse(response, symbol, false);
+        } catch (Exception e) {
+            log.error("Yahoo 일봉 조회 실패: symbol={}, {}", symbol, e.getMessage());
+            return Collections.emptyList();
+        }
+    }
+
+    /** Yahoo Finance에서 해외 종목 1분봉 조회 (집계 전 원본) */
+    private List<CandleDto> fetchYahooMinuteCandles1M(String symbol) {
+        try {
+            String response = yahooWebClient.get()
+                .uri(uriBuilder -> uriBuilder
+                    .scheme("https")
+                    .host("query1.finance.yahoo.com")
+                    .path("/v8/finance/chart/{symbol}")
+                    .queryParam("interval", "1m")
+                    .queryParam("range", "5d")
+                    .build(symbol))
+                .retrieve()
+                .bodyToMono(String.class)
+                .block();
+
+            return parseYahooCandleResponse(response, symbol, true);
+        } catch (Exception e) {
+            log.error("Yahoo 1분봉 조회 실패: symbol={}, {}", symbol, e.getMessage());
+            return Collections.emptyList();
+        }
+    }
+
+    /** Yahoo Finance 캔들 응답 파싱 */
+    private List<CandleDto> parseYahooCandleResponse(String response, String symbol, boolean isMinute) {
+        if (response == null || response.isBlank()) return Collections.emptyList();
+
+        try {
+            JsonNode root   = objectMapper.readTree(response);
+            JsonNode result = root.path("chart").path("result");
+            if (!result.isArray() || result.isEmpty()) return Collections.emptyList();
+
+            JsonNode item       = result.get(0);
+            JsonNode timestamps = item.path("timestamp");
+            JsonNode quoteArr   = item.path("indicators").path("quote");
+            if (!timestamps.isArray() || quoteArr.isEmpty()) return Collections.emptyList();
+
+            JsonNode quote   = quoteArr.get(0);
+            JsonNode opens   = quote.path("open");
+            JsonNode highs   = quote.path("high");
+            JsonNode lows    = quote.path("low");
+            JsonNode closes  = quote.path("close");
+            JsonNode volumes = quote.path("volume");
+
+            // 미국 장 시간대 (ET)
+            ZoneId et = ZoneId.of("America/New_York");
+            DateTimeFormatter dtf = isMinute
+                ? DateTimeFormatter.ofPattern("yyyyMMddHHmmss")
+                : DateTimeFormatter.ofPattern("yyyyMMdd");
+
+            List<CandleDto> candles = new ArrayList<>();
+            for (int i = 0; i < timestamps.size(); i++) {
+                double close = closes.get(i).asDouble(Double.NaN);
+                if (Double.isNaN(close) || close <= 0) continue;
+
+                long ts = timestamps.get(i).asLong();
+                ZonedDateTime zdt = Instant.ofEpochSecond(ts).atZone(et);
+                String date = zdt.format(dtf);
+
+                candles.add(CandleDto.builder()
+                    .date(date)
+                    .open(opens.get(i).asDouble(close))
+                    .high(highs.get(i).asDouble(close))
+                    .low(lows.get(i).asDouble(close))
+                    .close(close)
+                    .volume(volumes.get(i).asLong(0))
+                    .build());
+            }
+
+            candles.sort((a, b) -> a.getDate().compareTo(b.getDate()));
+            log.info("Yahoo 캔들 파싱 완료: symbol={}, isMinute={}, count={}", symbol, isMinute, candles.size());
+            return candles;
+
+        } catch (Exception e) {
+            log.error("Yahoo 캔들 파싱 실패: symbol={}, {}", symbol, e.getMessage());
+            return Collections.emptyList();
         }
     }
 }
