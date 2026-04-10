@@ -11,8 +11,6 @@ spring:
     timeout-per-shutdown-phase: 30s
 
 naver:
-  chart-url: https://fchart.stock.naver.com/siseJson.nhn
-  search-url: https://ac.stock.naver.com/ac
   stock-basic-url: https://m.stock.naver.com/api/stock
   etf-basic-url: https://m.stock.naver.com/api/etf
 

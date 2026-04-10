@@ -91,8 +91,7 @@
     <div class="us-news-section mb-3" id="usNewsSection">
         <div class="d-flex align-items-center justify-content-between mb-2">
             <h6 class="mb-0 text-secondary fw-semibold">
-                <i class="bi bi-newspaper me-1"></i>미국 증시 주요 뉴스
-                <span class="badge bg-secondary ms-1" style="font-size:0.65rem;">구글 뉴스</span>
+                <i class="bi bi-newspaper me-1"></i>미국 주요뉴스
             </h6>
             <small class="text-secondary" id="newsUpdated"></small>
         </div>
@@ -638,7 +637,7 @@
     async function loadUsNews() {
         const container = document.getElementById('usNewsList');
         try {
-            const res = await fetch('/api/stock/us-news?limit=5');
+            const res = await fetch('/api/stock/us-news?limit=10');
             if (!res.ok) throw new Error('뉴스 조회 실패');
             const news = await res.json();
             if (!news || news.length === 0) {
@@ -1488,12 +1487,15 @@
             .replace(/'/g, '&#39;');
     }
 
-    let refreshCountdown = 600;
+    const STOCK_INTERVAL = 300;   // 주식 갱신: 5분
+    const NEWS_INTERVAL  = 1800;  // 뉴스 갱신: 30분
+    let stockCountdown = STOCK_INTERVAL;
+    let newsCountdown  = NEWS_INTERVAL;
     let countdownInterval = null;
 
     function updateCountdownDisplay() {
-        const min = Math.floor(refreshCountdown / 60);
-        const sec = refreshCountdown % 60;
+        const min = Math.floor(stockCountdown / 60);
+        const sec = stockCountdown % 60;
         const el = document.getElementById('nextRefresh');
         if (el) {
             el.textContent = '다음 갱신: ' + min + '분 ' + (sec < 10 ? '0' : '') + sec + '초';
@@ -1502,31 +1504,37 @@
 
     function startCountdown() {
         if (countdownInterval) clearInterval(countdownInterval);
-        refreshCountdown = 600;
+        stockCountdown = STOCK_INTERVAL;
+        newsCountdown  = NEWS_INTERVAL;
         updateCountdownDisplay();
-        countdownInterval = setInterval(() => {
-            refreshCountdown--;
-            if (refreshCountdown <= 0) {
-                refreshAll();
-            } else {
-                updateCountdownDisplay();
+        countdownInterval = setInterval(async () => {
+            stockCountdown--;
+            newsCountdown--;
+            if (stockCountdown <= 0) {
+                stockCountdown = STOCK_INTERVAL;
+                await refreshStock();
             }
+            if (newsCountdown <= 0) {
+                newsCountdown = NEWS_INTERVAL;
+                await loadUsNews();
+            }
+            updateCountdownDisplay();
         }, 1000);
     }
 
-    async function refreshAll() {
-        refreshCountdown = 600;
-        updateCountdownDisplay();
+    async function refreshStock() {
         await Promise.all([
             loadMarketIndicators(),
-            loadUsNews(),
             loadTopTable('stock', 'stockTableBody', 'stockUpdated'),
             loadTopTable('etf', 'etfTableBody', 'etfUpdated'),
             loadUsTable('us_stock', 'usStockTableBody', 'usStockUpdated', usStockPriceCache),
             loadUsTable('us_etf', 'usEtfTableBody', 'usEtfUpdated', usEtfPriceCache),
             refreshWatchlist(),
         ]);
-        startCountdown();
+    }
+
+    async function refreshAll() {
+        await Promise.all([refreshStock(), loadUsNews()]);
     }
 
     async function initialize() {

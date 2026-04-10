@@ -366,21 +366,32 @@ body {
     flex-direction: row;
     gap: 12px;
     overflow-x: auto;
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-    padding-bottom: 4px;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 6px;
 }
 
 .us-news-scroll::-webkit-scrollbar {
-    display: none;
+    height: 4px;
+}
+
+.us-news-scroll::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 2px;
+}
+
+.us-news-scroll::-webkit-scrollbar-thumb {
+    background: rgba(255, 193, 7, 0.35);
+    border-radius: 2px;
 }
 
 .us-news-card {
     display: flex;
     flex-direction: column;
-    min-width: 300px;
-    max-width: 360px;
-    flex-shrink: 0;
+    flex: 0 0 260px;
+    min-width: 260px;
+    max-width: 260px;
+    scroll-snap-align: start;
     padding: 14px 16px;
     background: rgba(255, 255, 255, 0.04);
     border: 1px solid rgba(255, 255, 255, 0.08);
@@ -445,7 +456,8 @@ body {
     border: 1px solid rgba(255, 255, 255, 0.06);
     border-radius: 8px;
     padding: 14px 16px;
-    min-width: 300px;
+    flex: 0 0 260px;
+    min-width: 260px;
 }
 
 /* 라이트 모드 뉴스 */

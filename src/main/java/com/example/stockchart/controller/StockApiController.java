@@ -108,7 +108,7 @@ public class StockApiController {
 
     @GetMapping("/us-news")
     public ResponseEntity<List<UsNewsDto>> getUsNews(
-        @RequestParam(name = "limit", defaultValue = "5") int limit) {
+        @RequestParam(name = "limit", defaultValue = "10") int limit) {
         log.info("REST 미국 뉴스 요청: limit={}", limit);
         return ResponseEntity.ok(stockDataFacade.getUsNews(limit));
     }
