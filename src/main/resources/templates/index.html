@@ -26,8 +26,8 @@
     </div>
 </nav>
 
-<div class="container-fluid px-4 py-4">
-    <div class="row mb-4">
+<div class="container-fluid px-4 py-3 main-content">
+    <div class="row mb-2">
         <div class="col-lg-6 col-md-8 position-relative">
             <div class="input-group input-group-lg">
                 <span class="input-group-text bg-secondary border-secondary text-light">
@@ -83,6 +83,34 @@
             <div class="market-indicator-card skeleton">
                 <div class="skeleton-line short"></div>
                 <div class="skeleton-line long"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 미국 증시 뉴스 섹션 -->
+    <div class="us-news-section mb-3" id="usNewsSection">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+            <h6 class="mb-0 text-secondary fw-semibold">
+                <i class="bi bi-newspaper me-1"></i>미국 증시 주요 뉴스
+                <span class="badge bg-secondary ms-1" style="font-size:0.65rem;">구글 뉴스</span>
+            </h6>
+            <small class="text-secondary" id="newsUpdated"></small>
+        </div>
+        <div class="us-news-scroll" id="usNewsList">
+            <div class="us-news-card skeleton-news">
+                <div class="skeleton-line short mb-2" style="height:10px;width:30%"></div>
+                <div class="skeleton-line long mb-1" style="height:14px;width:90%"></div>
+                <div class="skeleton-line long" style="height:12px;width:70%"></div>
+            </div>
+            <div class="us-news-card skeleton-news">
+                <div class="skeleton-line short mb-2" style="height:10px;width:30%"></div>
+                <div class="skeleton-line long mb-1" style="height:14px;width:90%"></div>
+                <div class="skeleton-line long" style="height:12px;width:70%"></div>
+            </div>
+            <div class="us-news-card skeleton-news">
+                <div class="skeleton-line short mb-2" style="height:10px;width:30%"></div>
+                <div class="skeleton-line long mb-1" style="height:14px;width:90%"></div>
+                <div class="skeleton-line long" style="height:12px;width:70%"></div>
             </div>
         </div>
     </div>
@@ -221,7 +249,7 @@
             <div class="card bg-dark border-secondary">
                 <div class="card-header border-secondary d-flex justify-content-between align-items-center">
                     <div class="d-flex align-items-center gap-3">
-                        <h5 class="mb-0"><i class="bi bi-globe-americas me-2 text-success"></i>미국 주식 인기 종목 10개</h5>
+                        <h5 class="mb-0"><i class="bi bi-globe-americas me-2 text-success"></i>미국 주식 S&P500 상위 10개</h5>
                         <div class="btn-group btn-group-sm" role="group" id="usStockCurrencyToggle">
                             <button class="btn btn-warning us-currency-btn active" data-table="usStock" data-cur="USD">$ USD</button>
                             <button class="btn btn-outline-warning us-currency-btn" data-table="usStock" data-cur="KRW">₩ 원화</button>
@@ -260,7 +288,7 @@
             <div class="card bg-dark border-secondary">
                 <div class="card-header border-secondary d-flex justify-content-between align-items-center">
                     <div class="d-flex align-items-center gap-3">
-                        <h5 class="mb-0"><i class="bi bi-collection-fill me-2 text-primary"></i>미국 ETF 인기 종목 10개</h5>
+                        <h5 class="mb-0"><i class="bi bi-collection-fill me-2 text-primary"></i>미국 주요 ETF 15개</h5>
                         <div class="btn-group btn-group-sm" role="group" id="usEtfCurrencyToggle">
                             <button class="btn btn-warning us-currency-btn active" data-table="usEtf" data-cur="USD">$ USD</button>
                             <button class="btn btn-outline-warning us-currency-btn" data-cur="KRW" data-table="usEtf">₩ 원화</button>
@@ -299,7 +327,13 @@
             <div class="card bg-dark border-secondary">
                 <div class="card-header border-secondary">
                     <div class="d-flex justify-content-between align-items-center mb-2">
-                        <h5 class="mb-0"><i class="bi bi-bookmark-star me-2 text-success"></i>내 관심 종목 / ETF</h5>
+                        <div class="d-flex align-items-center gap-3">
+                            <h5 class="mb-0"><i class="bi bi-bookmark-star me-2 text-success"></i>내 관심 종목 / ETF</h5>
+                            <div class="btn-group btn-group-sm" role="group" id="watchlistCurrencyToggle">
+                                <button class="btn btn-warning watchlist-currency-btn active" data-cur="USD">$ USD</button>
+                                <button class="btn btn-outline-warning watchlist-currency-btn" data-cur="KRW">₩ 원화</button>
+                            </div>
+                        </div>
                         <div class="d-flex align-items-center gap-2">
                             <small class="text-secondary" id="watchlistUpdated"></small>
                             <button class="btn btn-sm btn-outline-success" onclick="promptAddGroup()" title="그룹 추가">
@@ -429,6 +463,9 @@
         }
     }
 
+    // 차트 상세 페이지로 이동하는 대표 지수 ID 목록
+    const CHART_INDICATOR_IDS = new Set(['KOSPI', 'KOSDAQ', 'SP500', 'NASDAQ', 'DJI']);
+
     function renderMarketIndicators(indicators) {
         const container = document.getElementById('marketIndicatorList');
         const isDark = getStoredTheme() === 'dark';
@@ -446,7 +483,11 @@
                 ? `${changeSign}${Math.abs(ind.changeRate).toFixed(2)}%`
                 : '0.00%';
 
-            return `<div class="market-indicator-card" data-id="${ind.id}">
+            const isChartable = CHART_INDICATOR_IDS.has(ind.id);
+            const clickable = isChartable ? ' clickable' : '';
+            const onclick = isChartable ? ` onclick="location.href='/chart/${ind.id}'"` : '';
+
+            return `<div class="market-indicator-card${clickable}" data-id="${ind.id}"${onclick}>
                 <div class="indicator-top">
                     <span class="indicator-name">${ind.name}</span>
                     <span class="indicator-rate ${changeClass}">${arrow} ${rateStr}</span>
@@ -524,13 +565,16 @@
         }
 
         localStorage.setItem('theme', theme);
+
+        // 그룹 필터 버튼 색상 테마에 맞게 재렌더
+        if (typeof renderGroupFilter === 'function') {
+            renderGroupFilter();
+        }
     }
 
     function toggleTheme() {
         applyTheme(getStoredTheme() === 'dark' ? 'light' : 'dark');
     }
-
-    (function() { applyTheme(getStoredTheme()); })();
 
     const searchResultsEl = document.getElementById('searchResults');
     const searchInputEl = document.getElementById('searchInput');
@@ -547,8 +591,11 @@
     let usdKrwRate = 0;
     let usStockDisplayCurrency = 'USD';
     let usEtfDisplayCurrency = 'USD';
+    let watchlistDisplayCurrency = 'USD';
     let usStockPriceCache = []; // {item, price} 배열
     let usEtfPriceCache = [];   // {item, price} 배열
+
+    (function() { applyTheme(getStoredTheme()); })();
 
     function loadGroupOrder() {
         try {
@@ -580,11 +627,55 @@
     }
 
     async function fetchTopList(type) {
-        const res = await fetch('/api/stock/top?type=' + encodeURIComponent(type) + '&limit=10');
+        const limit = (type === 'us_etf') ? 15 : 10;
+        const res = await fetch('/api/stock/top?type=' + encodeURIComponent(type) + '&limit=' + limit);
         if (!res.ok) {
             throw new Error('상위 목록 조회 실패');
         }
         return res.json();
+    }
+
+    async function loadUsNews() {
+        const container = document.getElementById('usNewsList');
+        try {
+            const res = await fetch('/api/stock/us-news?limit=5');
+            if (!res.ok) throw new Error('뉴스 조회 실패');
+            const news = await res.json();
+            if (!news || news.length === 0) {
+                container.innerHTML = '<div class="text-secondary px-3 py-2 small">뉴스를 불러오지 못했습니다.</div>';
+                return;
+            }
+            container.innerHTML = news.map(item => {
+                const pubText = item.pubDate ? formatNewsDate(item.pubDate) : '';
+                const desc = item.description ? escHtml(item.description) : '';
+                const src = item.source ? escHtml(item.source) : '구글 뉴스';
+                return `<a href="${escHtml(item.link)}" target="_blank" rel="noopener noreferrer" class="us-news-card">
+                    <div class="news-meta">
+                        <span class="news-source">${src}</span>
+                        ${pubText ? `<span class="news-date">${pubText}</span>` : ''}
+                    </div>
+                    <div class="news-title">${escHtml(item.title)}</div>
+                    ${desc ? `<div class="news-desc">${desc}</div>` : ''}
+                </a>`;
+            }).join('');
+            document.getElementById('newsUpdated').textContent =
+                '업데이트: ' + new Date().toLocaleTimeString('ko-KR');
+        } catch (e) {
+            container.innerHTML = '<div class="text-secondary px-3 py-2 small">뉴스를 불러오지 못했습니다.</div>';
+        }
+    }
+
+    function formatNewsDate(dateStr) {
+        try {
+            const d = new Date(dateStr);
+            if (isNaN(d.getTime())) return dateStr;
+            const now = new Date();
+            const diffMs = now - d;
+            const diffH = Math.floor(diffMs / 3600000);
+            if (diffH < 1) return '방금';
+            if (diffH < 24) return diffH + '시간 전';
+            return d.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' });
+        } catch(e) { return ''; }
     }
 
     async function fetchWatchlist() {
@@ -660,13 +751,17 @@
         }
     }
 
+    function groupInactiveClass() {
+        return getStoredTheme() === 'dark' ? 'btn-outline-secondary' : 'btn-outline-dark';
+    }
+
     function renderGroupFilter() {
         const container = document.getElementById('groupFilter');
         container.innerHTML = '';
 
         // "전체" 버튼 (드래그 불가)
         const allBtn = document.createElement('button');
-        allBtn.className = 'btn btn-sm group-filter-btn ' + (currentGroupFilter === '__all__' ? 'btn-warning' : 'btn-outline-secondary');
+        allBtn.className = 'btn btn-sm group-filter-btn ' + (currentGroupFilter === '__all__' ? 'btn-warning' : groupInactiveClass());
         allBtn.dataset.group = '__all__';
         const uniqueCount = new Set(watchlistPriceCache.map(r => r.item.symbol)).size;
         allBtn.textContent = '전체 (' + uniqueCount + ')';
@@ -683,7 +778,7 @@
             const isActive = currentGroupFilter === g;
 
             const btn = document.createElement('button');
-            btn.className = 'btn btn-sm group-filter-btn ' + (isActive ? 'btn-warning' : 'btn-outline-secondary');
+            btn.className = 'btn btn-sm group-filter-btn ' + (isActive ? 'btn-warning' : groupInactiveClass());
             btn.dataset.group = g;
             btn.draggable = true;
             btn.style.cursor = 'grab';
@@ -848,8 +943,12 @@
         const priceCell = fmtUsPriceCell(price.currentPrice, displayCurrency);
         const changeCell = fmtUsChangeCell(price.priceChange, displayCurrency);
 
+        const descHtml = item.description
+            ? '<br><small class="text-secondary fw-normal" style="font-size:0.72rem">' + escHtml(item.description) + '</small>'
+            : '';
+
         return '<tr>' +
-            '<td class="fw-semibold">' + escHtml(price.name || item.name) + '</td>' +
+            '<td class="fw-semibold">' + escHtml(price.name || item.name) + descHtml + '</td>' +
             '<td class="text-secondary font-monospace">' + escHtml(price.symbol) + '</td>' +
             '<td class="text-end fw-bold">' + priceCell + '</td>' +
             '<td class="text-end ' + colorClass + '">' + icon + ' ' + sign + changeCell + '</td>' +
@@ -929,6 +1028,18 @@
         return groups.map(g => '<span class="badge bg-outline-secondary border border-secondary me-1" style="font-size:0.7rem">' + escHtml(g) + '</span>').join('');
     }
 
+    const ETF_NAME_RE = /KODEX|TIGER|KOSEF|ARIRANG|ACE|RISE|SOL|HANARO|KBSTAR|ETF|ETN/i;
+
+    function buildTypeBadge(item, price) {
+        const isUs = price ? (price.currency === 'USD') : /^[A-Za-z]/.test(item.symbol);
+        const displayName = (price ? price.name : null) || item.name || '';
+        const isEtf = item.type === 'etf' || ETF_NAME_RE.test(displayName);
+        if (isUs && isEtf) return '<span class="badge bg-warning text-dark">US ETF</span>';
+        if (isUs)          return '<span class="badge bg-success">US 주식</span>';
+        if (isEtf)         return '<span class="badge bg-info">ETF</span>';
+        return '<span class="badge bg-secondary">주식</span>';
+    }
+
     function buildWatchlistRow(price, item) {
         const isUp = price.priceChange > 0;
         const isDown = price.priceChange < 0;
@@ -936,6 +1047,10 @@
         const sign = isUp ? '+' : isDown ? '-' : '';
         const icon = isUp ? '&#9650;' : (isDown ? '&#9660;' : '&#9472;');
         const cur = price.currency || 'KRW';
+
+        const priceCell = cur === 'USD'
+            ? fmtUsPriceCell(price.currentPrice, watchlistDisplayCurrency)
+            : fmtPriceCell(price.currentPrice, cur);
 
         const isAllView = currentGroupFilter === '__all__';
         const groupCell = isAllView
@@ -948,10 +1063,9 @@
         return '<tr>' +
             '<td class="fw-semibold">' + escHtml(price.name || item.name) + '</td>' +
             '<td class="text-secondary font-monospace small">' + escHtml(item.symbol) + '</td>' +
-            '<td><span class="badge ' + (item.type === 'etf' ? 'bg-info' : 'bg-secondary') + '">' +
-            escHtml(item.type === 'etf' ? 'ETF' : '주식') + '</span></td>' +
+            '<td>' + buildTypeBadge(item, price) + '</td>' +
             groupCell +
-            '<td class="text-end fw-bold">' + fmtPriceCell(price.currentPrice, cur) + '</td>' +
+            '<td class="text-end fw-bold">' + priceCell + '</td>' +
             '<td class="text-end ' + colorClass + '">' + icon + ' ' + sign + Math.abs(Number(price.changeRate || 0)).toFixed(2) + '%</td>' +
             '<td class="text-end text-secondary">' + formatNumber(price.volume) + '</td>' +
             '<td class="text-center">' +
@@ -973,8 +1087,7 @@
         return '<tr>' +
             '<td class="fw-semibold">' + escHtml(item.name || item.symbol) + '</td>' +
             '<td class="text-secondary font-monospace small">' + escHtml(item.symbol) + '</td>' +
-            '<td><span class="badge ' + (item.type === 'etf' ? 'bg-info' : 'bg-secondary') + '">' +
-            escHtml(item.type === 'etf' ? 'ETF' : '주식') + '</span></td>' +
+            '<td>' + buildTypeBadge(item, null) + '</td>' +
             groupCell +
             '<td colspan="3" class="text-secondary text-center small">조회 실패</td>' +
             '<td class="text-center">' +
@@ -1064,6 +1177,23 @@
     }
 
     function bindEvents() {
+        // 관심종목 USD/KRW 토글
+        document.addEventListener('click', function(e) {
+            const btn = e.target.closest('.watchlist-currency-btn');
+            if (!btn) return;
+            const cur = btn.dataset.cur;
+            const group = document.getElementById('watchlistCurrencyToggle');
+            if (group) {
+                group.querySelectorAll('.watchlist-currency-btn').forEach(b => {
+                    b.classList.toggle('btn-warning', b.dataset.cur === cur);
+                    b.classList.toggle('btn-outline-warning', b.dataset.cur !== cur);
+                    b.classList.toggle('active', b.dataset.cur === cur);
+                });
+            }
+            watchlistDisplayCurrency = cur;
+            renderWatchlistTable();
+        });
+
         // 미국 주식/ETF USD/KRW 토글
         document.addEventListener('click', function(e) {
             const btn = e.target.closest('.us-currency-btn');
@@ -1389,6 +1519,7 @@
         updateCountdownDisplay();
         await Promise.all([
             loadMarketIndicators(),
+            loadUsNews(),
             loadTopTable('stock', 'stockTableBody', 'stockUpdated'),
             loadTopTable('etf', 'etfTableBody', 'etfUpdated'),
             loadUsTable('us_stock', 'usStockTableBody', 'usStockUpdated', usStockPriceCache),
@@ -1401,6 +1532,7 @@
     async function initialize() {
         bindEvents();
         await loadMarketIndicators(); // 환율 먼저 로드 (USD/KRW 변환에 필요)
+        loadUsNews(); // 뉴스는 병렬로 로드
         await refreshWatchlist();
         await Promise.all([
             loadTopTable('stock', 'stockTableBody', 'stockUpdated'),

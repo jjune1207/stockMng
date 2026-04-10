@@ -1,9 +1,60 @@
 /* ──────────────────────────────────────────
    공통 스타일
 ────────────────────────────────────────── */
+html {
+    height: 100%;
+    overflow: hidden;
+}
+
 body {
     font-family: 'Pretendard', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
-    min-height: 100vh;
+    height: 100%;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+/* 메인 콘텐츠 영역 - 전체 남은 높이 차지 */
+.main-content {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+/* 탭 콘텐츠 영역 - 남은 공간 채움 */
+.tab-content {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* 표시중인 탭 패널 */
+.tab-pane.show {
+    height: 100%;
+    overflow: hidden;
+}
+
+/* 탭 패널 내 카드 - flex 컬럼으로 확장 */
+.tab-pane .card {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.tab-pane .card-body {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    padding: 0 !important;
+}
+
+/* 테이블 영역 내부 스크롤 */
+.tab-pane .table-responsive {
+    height: 100%;
+    overflow-y: auto;
 }
 
 /* 테이블 */
@@ -76,6 +127,13 @@ body {
 /* ──────────────────────────────────────────
    주요 시장 지표 바
 ────────────────────────────────────────── */
+.market-indicator-bar,
+.us-news-section,
+.row.mb-2,
+.nav-tabs {
+    flex-shrink: 0;
+}
+
 .market-indicator-bar {
     background: rgba(0, 0, 0, 0.25);
     border-color: #495057 !important;
@@ -106,6 +164,10 @@ body {
     cursor: default;
     flex-shrink: 0;
     transition: background 0.15s;
+}
+
+.market-indicator-card.clickable {
+    cursor: pointer;
 }
 
 .market-indicator-card:hover {
@@ -185,6 +247,22 @@ body {
 }
 
 /* ──────────────────────────────────────────
+   다크 모드 가독성 개선
+────────────────────────────────────────── */
+
+/* 테이블 내 종목코드·거래량 등 보조 텍스트 밝기 향상 */
+[data-bs-theme="dark"] td.text-secondary,
+[data-bs-theme="dark"] th.text-secondary {
+    color: #ced4da !important;
+}
+
+/* 미국주식 설명, 업데이트 시각 등 small 태그 가독성 향상 */
+[data-bs-theme="dark"] .table small.text-secondary,
+[data-bs-theme="dark"] td small.text-secondary {
+    color: #adb5bd !important;
+}
+
+/* ──────────────────────────────────────────
    라이트 모드 오버라이드
 ────────────────────────────────────────── */
 [data-bs-theme="light"] .market-indicator-bar {
@@ -242,8 +320,9 @@ body {
     border-color: #dee2e6 #dee2e6 #fff !important;
 }
 
-[data-bs-theme="light"] .group-filter-btn {
-    border-color: #dee2e6 !important;
+[data-bs-theme="light"] .group-filter-btn:not(.btn-warning) {
+    color: #343a40 !important;
+    border-color: #6c757d !important;
 }
 
 [data-bs-theme="light"] .search-item:hover {
@@ -273,6 +352,126 @@ body {
 
 [data-bs-theme="light"] .indicator-panel {
     border: 1px solid #dee2e6;
+}
+
+/* ──────────────────────────────────────────
+   미국 증시 뉴스 섹션
+────────────────────────────────────────── */
+.us-news-section {
+    position: relative;
+}
+
+.us-news-scroll {
+    display: flex;
+    flex-direction: row;
+    gap: 12px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    padding-bottom: 4px;
+}
+
+.us-news-scroll::-webkit-scrollbar {
+    display: none;
+}
+
+.us-news-card {
+    display: flex;
+    flex-direction: column;
+    min-width: 300px;
+    max-width: 360px;
+    flex-shrink: 0;
+    padding: 14px 16px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    text-decoration: none;
+    color: inherit;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.us-news-card:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 193, 7, 0.4);
+    color: inherit;
+    text-decoration: none;
+}
+
+.news-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.news-source {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #ffc107;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.news-date {
+    font-size: 0.72rem;
+    color: #6c757d;
+}
+
+.news-title {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: #e9ecef;
+    line-height: 1.4;
+    margin-bottom: 4px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.news-desc {
+    font-size: 0.78rem;
+    color: #6c757d;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.skeleton-news {
+    animation: skeleton-pulse 1.5s ease-in-out infinite;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 8px;
+    padding: 14px 16px;
+    min-width: 300px;
+}
+
+/* 라이트 모드 뉴스 */
+[data-bs-theme="light"] .us-news-card {
+    background: #ffffff;
+    border-color: #dee2e6;
+    color: #212529;
+}
+
+[data-bs-theme="light"] .us-news-card:hover {
+    background: #f8f9fa;
+    border-color: #0d6efd;
+    color: #212529;
+}
+
+[data-bs-theme="light"] .news-title {
+    color: #212529;
+}
+
+[data-bs-theme="light"] .news-source {
+    color: #0d6efd;
+}
+
+[data-bs-theme="light"] .skeleton-news {
+    background: rgba(0, 0, 0, 0.04);
+    border-color: rgba(0, 0, 0, 0.08);
 }
 
 /* ──────────────────────────────────────────

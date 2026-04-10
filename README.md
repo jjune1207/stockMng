@@ -15,7 +15,7 @@ DB 없이 네이버 증권 API와 Yahoo Finance를 활용하여 거래량 상위
 - **타임프레임**: 1분봉 / 3분봉 / 10분봉 (최근 5영업일) / 일봉 (최대 3년)
 - **기술적 지표**: MA(5/20/50/100/200), 볼린저 밴드
 - **종합 매매 분석**: 5개 지표 종합 점수 기반 매수/매도 판정 및 코멘트
-- **주요 시장 지표**: 코스피, 코스닥, 환율(USD/KRW), WTI, 해외 지수(S&P 500, 나스닥, 다우 등) 실시간 표시
+- **주요 시장 지표**: 코스피, 코스닥, S&P 500, 나스닥, 다우지수, 환율(USD/KRW), WTI 실시간 표시 (순서 고정). 코스피/코스닥/S&P500/나스닥/다우 클릭 시 차트 상세 페이지 이동
 - **해외 종목 지원**: Yahoo Finance 연동으로 미국 주식 시세·차트 조회, 원화/달러 가격 토글
 - **다크/라이트 모드 전환**: 상단 토글 버튼으로 테마 변경 (localStorage 저장, 메인/차트 페이지 모두 지원)
 
@@ -73,7 +73,7 @@ http://localhost:8080
 ### 메인 화면 (`/`)
 
 - **검색창**: 종목명 또는 코드 입력 (디바운스 자동완성, 코드 입력 시 차트 직행)
-- **주요 시장 지표 바**: 코스피, 코스닥, 환율(USD/KRW), WTI, 해외 주요 지수 실시간 표시
+- **주요 시장 지표 바**: 코스피, 코스닥, S&P500, 나스닥, 다우지수, 환율(USD/KRW), WTI 실시간 표시. 5개 지수 카드 클릭 시 차트 상세 페이지 이동
 - **주요 주식 탭**: 거래량 상위 주식 10개 (현재가, 등락률, 거래량)
 - **주요 ETF 탭**: 거래량 상위 ETF 10개
 - **관심 종목 탭**: 사용자가 추가한 종목/ETF 목록 (그룹별 분류)
@@ -112,9 +112,10 @@ http://localhost:8080
 | GET | `/api/stock/{symbol}/price` | 현재가 (30초 캐시) |
 | GET | `/api/stock/{symbol}/candle?timeframe=day` | 캔들 OHLCV + MA + 볼린저 (`timeframe`: `day`/`1`/`3`/`10`) |
 | GET | `/api/stock/search?keyword=삼성` | 종목/ETF 검색 (60분 캐시) |
-| GET | `/api/stock/top?type=stock&limit=10` | 거래량 상위 목록 (10분 캐시) |
+| GET | `/api/stock/top?type=stock&limit=10` | 거래량 상위 목록 (`type`: `stock`/`etf`/`us_stock`/`us_etf`, 10분 캐시) |
 | GET | `/api/stock/market-indicators` | 주요 시장 지표 (코스피/코스닥/환율/WTI/해외지수, 5분 캐시) |
 | GET | `/api/stock/usdkrw-rate` | USD/KRW 환율 조회 |
+| GET | `/api/stock/us-news?limit=5` | 미국 주요 뉴스 (Google News RSS, 30분 캐시) |
 | GET | `/api/stock/watchlist` | 관심 종목 목록 조회 |
 | POST | `/api/stock/watchlist` | 관심 종목 추가 (`group` 필드 필수) |
 | DELETE | `/api/stock/watchlist/{symbol\|group}` | 관심 종목 삭제 (composite key 또는 symbol) |
@@ -178,6 +179,8 @@ POST /api/stock/watchlist
 | `stockSearch` | 60분 | 500 | 종목 검색 결과 |
 | `topRanking` | 10분 | 20 | 거래량 상위 목록 |
 | `marketIndicators` | 5분 | 10 | 시장 지표 (코스피/코스닥/환율/WTI/해외지수) |
+| `usPopular` | 30분 | 20 | 미국 인기 종목/ETF 목록 (고정 리스트) |
+| `usNews` | 30분 | 10 | 미국 주요 뉴스 (Google News RSS) |
 
 `application.yml`에서 변경 가능:
 ```yaml

@@ -26,4 +26,7 @@ public class StockSearchDto {
     /** 종목 유형 (stock / etf) */
     @Builder.Default
     private String type = "stock";
+
+    /** 한글 설명 (미국 ETF 전용, optional) */
+    private String description;
 }

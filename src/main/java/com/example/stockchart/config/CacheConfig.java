@@ -71,6 +71,13 @@ public class CacheConfig {
                 .maximumSize(5)
                 .build());
 
+        // 미국 뉴스 캐시: 30분 TTL (Yahoo Finance RSS)
+        cacheManager.registerCustomCache("usNews",
+            Caffeine.newBuilder()
+                .expireAfterWrite(30, TimeUnit.MINUTES)
+                .maximumSize(10)
+                .build());
+
         return cacheManager;
     }
 }

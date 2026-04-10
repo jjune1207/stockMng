@@ -4,6 +4,7 @@ import com.example.stockchart.dto.CandleDto;
 import com.example.stockchart.dto.MarketIndicatorDto;
 import com.example.stockchart.dto.StockPriceDto;
 import com.example.stockchart.dto.StockSearchDto;
+import com.example.stockchart.dto.UsNewsDto;
 import com.example.stockchart.exception.StockApiException;
 import com.example.stockchart.service.NaverStockService;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -15,7 +16,13 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.NodeList;
 
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import java.io.ByteArrayInputStream;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -70,9 +77,25 @@ public class NaverStockServiceImpl implements NaverStockService {
         "\\[\"(\\d{8})\"\\s*,\\s*([\\d.]+)\\s*,\\s*([\\d.]+)\\s*,\\s*([\\d.]+)\\s*,\\s*([\\d.]+)\\s*,\\s*([\\d.]+)"
     );
 
-    /** 해외 종목 여부 판단 (국내 종목: 6자리 숫자) */
+    /** 대표 지수 ID → Yahoo Finance 심볼 매핑 (차트 상세 페이지 지원) */
+    private static final Map<String, String> INDEX_YAHOO_SYMBOLS = Map.of(
+        "KOSPI",  "^KS11",
+        "KOSDAQ", "^KQ11",
+        "SP500",  "^GSPC",
+        "NASDAQ", "^IXIC",
+        "DJI",    "^DJI"
+    );
+
+    private String resolveYahooSymbol(String symbol) {
+        return INDEX_YAHOO_SYMBOLS.getOrDefault(symbol, symbol);
+    }
+
+    /** 해외 종목 여부 판단
+     * 국내 종목: 숫자로 시작하는 6자리 영숫자 코드 (일반주식 005930, ETN/ELW 0101N0 등)
+     * 해외 종목: 영문자로만 구성된 심볼 (AAPL, TSLA, GOOGL 등)
+     */
     private boolean isOverseasSymbol(String symbol) {
-        return symbol != null && !symbol.matches("^[0-9]{6}$");
+        return symbol == null || !symbol.matches("^[0-9][0-9A-Za-z]{5}$");
     }
 
     @Override
@@ -80,7 +103,7 @@ public class NaverStockServiceImpl implements NaverStockService {
     public List<CandleDto> getDailyCandles(String symbol) {
         if (isOverseasSymbol(symbol)) {
             log.info("해외 종목 일봉 조회 (Yahoo Finance): symbol={}", symbol);
-            return fetchYahooDailyCandles(symbol);
+            return fetchYahooDailyCandles(resolveYahooSymbol(symbol));
         }
         log.info("일봉 캔들 데이터 조회 시작: symbol={}", symbol);
 
@@ -133,7 +156,7 @@ public class NaverStockServiceImpl implements NaverStockService {
     public List<CandleDto> getMinuteCandles(String symbol, int intervalMinutes) {
         if (isOverseasSymbol(symbol)) {
             log.info("해외 종목 분봉 조회 (Yahoo Finance): symbol={}, interval={}분", symbol, intervalMinutes);
-            List<CandleDto> raw = fetchYahooMinuteCandles1M(symbol);
+            List<CandleDto> raw = fetchYahooMinuteCandles1M(resolveYahooSymbol(symbol));
             if (intervalMinutes <= 1) return raw;
             return aggregateMinuteCandles(raw, intervalMinutes);
         }
@@ -257,7 +280,7 @@ public class NaverStockServiceImpl implements NaverStockService {
 
         if (isOverseasSymbol(symbol)) {
             log.info("해외 종목 현재가 조회 (Yahoo Finance): symbol={}", symbol);
-            StockPriceDto price = fetchYahooCurrentPrice(symbol);
+            StockPriceDto price = fetchYahooCurrentPrice(resolveYahooSymbol(symbol));
             if (price != null) return price;
             throw new StockApiException("해외 종목 현재가 조회 실패: " + symbol, 404);
         }
@@ -335,33 +358,39 @@ public class NaverStockServiceImpl implements NaverStockService {
     @Override
     @Cacheable(value = "usPopular", key = "#p0 + ':' + #p1")
     public List<StockSearchDto> getUsPopular(String type, int limit) {
-        int safeLimit = Math.min(Math.max(limit, 1), 10);
+        int safeLimit = Math.min(Math.max(limit, 1), 20);
         boolean isEtf = "us_etf".equalsIgnoreCase(type);
 
+        // symbol, name, description (ETF만 사용)
         List<String[]> list = isEtf
             ? List.of(
-                new String[]{"SPY",  "SPDR S&P 500 ETF Trust"},
-                new String[]{"QQQ",  "Invesco QQQ Trust"},
-                new String[]{"TQQQ", "ProShares UltraPro QQQ"},
-                new String[]{"SQQQ", "ProShares UltraPro Short QQQ"},
-                new String[]{"SOXL", "Direxion Daily Semiconductor Bull 3X"},
-                new String[]{"SOXS", "Direxion Daily Semiconductor Bear 3X"},
-                new String[]{"IWM",  "iShares Russell 2000 ETF"},
-                new String[]{"GLD",  "SPDR Gold Shares"},
-                new String[]{"TLT",  "iShares 20+ Year Treasury Bond ETF"},
-                new String[]{"VTI",  "Vanguard Total Stock Market ETF"}
+                new String[]{"VTI",   "Vanguard Total Stock Market ETF",        "미국 전체 주식 시장"},
+                new String[]{"SPY",   "SPDR S&P 500 ETF Trust",                 "미국 500대 기업 지도"},
+                new String[]{"VOO",   "Vanguard S&P 500 ETF",                   "SPY 쌍둥이, 더 저렴한 버전"},
+                new String[]{"SPYM",  "SPDR Portfolio S&P 500 High Div ETF",    "가성비 S&P500 ETF"},
+                new String[]{"QQQ",   "Invesco QQQ Trust",                      "나스닥 기술주 로켓 100"},
+                new String[]{"QQQM",  "Invesco NASDAQ 100 ETF",                 "QQQ의 귀여운 동생"},
+                new String[]{"SOXX",  "iShares Semiconductor ETF",              "반도체 엔진 모음"},
+                new String[]{"SCHD",  "Schwab U.S. Dividend Equity ETF",        "꾸준한 배당나무"},
+                new String[]{"DIVO",  "Amplify CWP Enhanced Dividend Income ETF","배당성장 선구자"},
+                new String[]{"JEPI",  "JPMorgan Equity Premium Income ETF",     "대형주 배당 ETF"},
+                new String[]{"JEPQ",  "JPMorgan Nasdaq Equity Premium Income ETF","기술주 배당 ETF"},
+                new String[]{"TLT",   "iShares 20+ Year Treasury Bond ETF",     "장기국채 ETF (30년)"},
+                new String[]{"XLF",   "Financial Select Sector SPDR Fund",      "금융 심장 섹터 ETF"},
+                new String[]{"VNQ",   "Vanguard Real Estate ETF",               "미국 건물주 리츠"},
+                new String[]{"GLDM",  "SPDR Gold MiniShares Trust",             "금(Gold) ETF"}
             )
             : List.of(
-                new String[]{"NVDA",  "NVIDIA Corporation"},
-                new String[]{"TSLA",  "Tesla Inc"},
-                new String[]{"AAPL",  "Apple Inc"},
-                new String[]{"AMZN",  "Amazon.com Inc"},
-                new String[]{"AMD",   "Advanced Micro Devices"},
-                new String[]{"META",  "Meta Platforms Inc"},
-                new String[]{"MSFT",  "Microsoft Corporation"},
-                new String[]{"PLTR",  "Palantir Technologies"},
-                new String[]{"GOOGL", "Alphabet Inc"},
-                new String[]{"NFLX",  "Netflix Inc"}
+                new String[]{"AAPL",  "Apple Inc",               null},
+                new String[]{"MSFT",  "Microsoft Corporation",   null},
+                new String[]{"NVDA",  "NVIDIA Corporation",      null},
+                new String[]{"AMZN",  "Amazon.com Inc",          null},
+                new String[]{"META",  "Meta Platforms Inc",      null},
+                new String[]{"GOOGL", "Alphabet Inc",            null},
+                new String[]{"TSLA",  "Tesla Inc",               null},
+                new String[]{"AVGO",  "Broadcom Inc",            null},
+                new String[]{"LLY",   "Eli Lilly and Company",   null},
+                new String[]{"JPM",   "JPMorgan Chase & Co",     null}
             );
 
         String normalizedType = isEtf ? "etf" : "stock";
@@ -372,6 +401,7 @@ public class NaverStockServiceImpl implements NaverStockService {
                 .name(arr[1])
                 .market("NASDAQ")
                 .type(normalizedType)
+                .description(arr.length > 2 ? arr[2] : null)
                 .build())
             .toList();
     }
@@ -384,11 +414,11 @@ public class NaverStockServiceImpl implements NaverStockService {
         List<MarketIndicatorDto> result = new ArrayList<>();
         result.add(fetchDomesticIndexIndicator("KOSPI", "KOSPI", "코스피"));
         result.add(fetchDomesticIndexIndicator("KOSDAQ", "KOSDAQ", "코스닥"));
-        result.add(fetchNaverMarketIndexIndicator("exchange", "FX_USDKRW", "USDKRW", "환율 (USD/KRW)"));
-        result.add(fetchNaverMarketIndexIndicator("energy", "CLcv1", "WTI", "WTI 유가"));
         result.add(fetchNaverForeignIndexIndicator(".INX", "SP500", "S&P 500", "^GSPC"));
         result.add(fetchNaverForeignIndexIndicator(".IXIC", "NASDAQ", "나스닥", "^IXIC"));
         result.add(fetchNaverForeignIndexIndicator(".DJI", "DJI", "다우지수", "^DJI"));
+        result.add(fetchNaverMarketIndexIndicator("exchange", "FX_USDKRW", "USDKRW", "환율 (USD/KRW)"));
+        result.add(fetchNaverMarketIndexIndicator("energy", "CLcv1", "WTI", "WTI 유가"));
 
         return result.stream().filter(Objects::nonNull).toList();
     }
@@ -1188,5 +1218,113 @@ public class NaverStockServiceImpl implements NaverStockService {
             log.error("Yahoo 캔들 파싱 실패: symbol={}, {}", symbol, e.getMessage());
             return Collections.emptyList();
         }
+    }
+
+    // ── 미국 증시 뉴스 조회 (Yahoo Finance RSS) ──────────────────────────────
+
+    @Override
+    @Cacheable(value = "usNews", key = "#limit")
+    public List<UsNewsDto> getUsNews(int limit) {
+        int safeLimit = Math.min(Math.max(limit, 1), 5);
+        log.info("미국 뉴스 조회 시작: limit={}", safeLimit);
+
+        // 1차 시도: Google News RSS (한국어) - 미국 증시 관련 한글 기사
+        String googleUrl = "https://news.google.com/rss/search"
+            + "?q=%EB%AF%B8%EA%B5%AD+%EC%A6%9D%EC%8B%9C+%EB%82%98%EC%8A%A4%EB%8B%A5"
+            + "&hl=ko&gl=KR&ceid=KR:ko";
+        try {
+            String xml = yahooWebClient.get()
+                .uri(googleUrl)
+                .retrieve()
+                .bodyToMono(String.class)
+                .block();
+            if (xml != null && !xml.isBlank() && xml.contains("<item>")) {
+                List<UsNewsDto> result = parseGoogleNewsXml(xml, safeLimit);
+                if (!result.isEmpty()) {
+                    log.info("구글 뉴스 조회 성공: {}건", result.size());
+                    return result;
+                }
+            }
+            log.warn("구글 뉴스 응답 없음 또는 빈 결과, Yahoo RSS 시도");
+        } catch (Exception e) {
+            log.warn("구글 뉴스 조회 실패: {}, Yahoo RSS 시도", e.getMessage());
+        }
+
+        // 2차 fallback: Yahoo Finance RSS (영어)
+        String yahooUrl = "https://feeds.finance.yahoo.com/rss/2.0/headline"
+            + "?s=%5EIXIC,%5EGSPC,%5EDJI&region=US&lang=en-US";
+        try {
+            String xml = yahooWebClient.get()
+                .uri(yahooUrl)
+                .retrieve()
+                .bodyToMono(String.class)
+                .block();
+            if (xml != null && !xml.isBlank() && xml.contains("<item>")) {
+                List<UsNewsDto> result = parseGoogleNewsXml(xml, safeLimit);
+                log.info("Yahoo Finance RSS 조회 성공: {}건", result.size());
+                return result;
+            }
+        } catch (Exception e) {
+            log.warn("Yahoo Finance RSS 조회도 실패: {}", e.getMessage());
+        }
+
+        return List.of();
+    }
+
+    /** Google News RSS XML 파싱 (한국어 기사) */
+    private List<UsNewsDto> parseGoogleNewsXml(String xml, int limit) {
+        List<UsNewsDto> result = new ArrayList<>();
+        try {
+            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+            DocumentBuilder builder = factory.newDocumentBuilder();
+            Document doc = builder.parse(new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8)));
+            doc.getDocumentElement().normalize();
+
+            NodeList items = doc.getElementsByTagName("item");
+            for (int i = 0; i < items.getLength() && result.size() < limit; i++) {
+                Element item = (Element) items.item(i);
+
+                String rawTitle = getXmlText(item, "title");
+                String link     = getXmlText(item, "link");
+                String pubDate  = getXmlText(item, "pubDate");
+
+                if (rawTitle.isBlank() || link.isBlank()) continue;
+
+                // Google News 제목 형식: "기사 제목 - 언론사명"
+                String source = "구글 뉴스";
+                String title  = rawTitle;
+                int dashIdx = rawTitle.lastIndexOf(" - ");
+                if (dashIdx > 0) {
+                    source = rawTitle.substring(dashIdx + 3).trim();
+                    title  = rawTitle.substring(0, dashIdx).trim();
+                }
+
+                // source 태그에서 언론사명 추출 (더 정확)
+                NodeList srcNodes = item.getElementsByTagName("source");
+                if (srcNodes.getLength() > 0) {
+                    String srcText = srcNodes.item(0).getTextContent();
+                    if (srcText != null && !srcText.isBlank()) source = srcText.trim();
+                }
+
+                result.add(UsNewsDto.builder()
+                    .title(title)
+                    .link(link)
+                    .pubDate(pubDate)
+                    .description("")
+                    .source(source)
+                    .build());
+            }
+        } catch (Exception e) {
+            log.warn("구글 뉴스 XML 파싱 실패: {}", e.getMessage());
+        }
+        return result;
+    }
+
+    private String getXmlText(Element parent, String tagName) {
+        NodeList nodes = parent.getElementsByTagName(tagName);
+        if (nodes.getLength() == 0) return "";
+        String text = nodes.item(0).getTextContent();
+        return text == null ? "" : text.trim();
     }
 }

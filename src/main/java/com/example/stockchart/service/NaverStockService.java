@@ -4,6 +4,7 @@ import com.example.stockchart.dto.CandleDto;
 import com.example.stockchart.dto.MarketIndicatorDto;
 import com.example.stockchart.dto.StockPriceDto;
 import com.example.stockchart.dto.StockSearchDto;
+import com.example.stockchart.dto.UsNewsDto;
 
 import java.util.List;
 
@@ -69,4 +70,12 @@ public interface NaverStockService {
      * @return 시장 지표 리스트 (스파크라인 히스토리 포함)
      */
     List<MarketIndicatorDto> getMarketIndicators();
+
+    /**
+     * 미국 증시 주요 뉴스 조회 (Yahoo Finance RSS)
+     *
+     * @param limit 최대 건수 (최대 10)
+     * @return 뉴스 리스트
+     */
+    List<UsNewsDto> getUsNews(int limit);
 }

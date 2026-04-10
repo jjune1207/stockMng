@@ -4,6 +4,7 @@ import com.example.stockchart.dto.CandleDto;
 import com.example.stockchart.dto.MarketIndicatorDto;
 import com.example.stockchart.dto.StockPriceDto;
 import com.example.stockchart.dto.StockSearchDto;
+import com.example.stockchart.dto.UsNewsDto;
 import com.example.stockchart.dto.WatchlistItemDto;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -47,6 +48,10 @@ public class StockDataFacade {
 
     public List<MarketIndicatorDto> getMarketIndicators() {
         return naverStockService.getMarketIndicators();
+    }
+
+    public List<UsNewsDto> getUsNews(int limit) {
+        return naverStockService.getUsNews(limit);
     }
 
     public List<WatchlistItemDto> getWatchlist() {

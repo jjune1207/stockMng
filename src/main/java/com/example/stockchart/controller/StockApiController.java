@@ -4,6 +4,7 @@ import com.example.stockchart.dto.CandleDto;
 import com.example.stockchart.dto.MarketIndicatorDto;
 import com.example.stockchart.dto.StockPriceDto;
 import com.example.stockchart.dto.StockSearchDto;
+import com.example.stockchart.dto.UsNewsDto;
 import com.example.stockchart.dto.WatchlistItemDto;
 import com.example.stockchart.dto.WatchlistRequestDto;
 import com.example.stockchart.service.StockDataFacade;
@@ -105,6 +106,13 @@ public class StockApiController {
         return ResponseEntity.ok(stockDataFacade.getMarketIndicators());
     }
 
+    @GetMapping("/us-news")
+    public ResponseEntity<List<UsNewsDto>> getUsNews(
+        @RequestParam(name = "limit", defaultValue = "5") int limit) {
+        log.info("REST 미국 뉴스 요청: limit={}", limit);
+        return ResponseEntity.ok(stockDataFacade.getUsNews(limit));
+    }
+
     @GetMapping("/usdkrw-rate")
     public ResponseEntity<Double> getUsdKrwRate() {
         List<MarketIndicatorDto> indicators = stockDataFacade.getMarketIndicators();
@@ -124,8 +132,8 @@ public class StockApiController {
             && !"us_stock".equalsIgnoreCase(type) && !"us_etf".equalsIgnoreCase(type)) {
             throw new IllegalArgumentException("type은 stock, etf, us_stock, us_etf만 허용됩니다.");
         }
-        if (limit < 1 || limit > 10) {
-            throw new IllegalArgumentException("limit은 1~10 범위로 입력해 주세요.");
+        if (limit < 1 || limit > 20) {
+            throw new IllegalArgumentException("limit은 1~20 범위로 입력해 주세요.");
         }
 
         return ResponseEntity.ok(stockDataFacade.getTopByVolume(type, limit));
