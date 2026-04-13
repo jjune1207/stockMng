@@ -66,6 +66,9 @@ public class NaverStockServiceImpl implements NaverStockService {
     @Value("${naver.etf-basic-url}")
     private String etfBasicUrl;
 
+    @Value("#{'${news.default-keywords}'.split(',')}")
+    private List<String> defaultNewsKeywords;
+
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyyMMdd");
     private static final Pattern TABLE_ROW_PATTERN = Pattern.compile(
         "<tr[^>]*>.*?<td[^>]*class=[\"']no[\"'][^>]*>\\s*\\d+\\s*</td>\\s*<td>\\s*<a[^>]*?/item/main\\.naver\\?code=([^\"'&>]+)[^>]*>(.*?)</a>",
@@ -1231,41 +1234,43 @@ public class NaverStockServiceImpl implements NaverStockService {
     // ── 미국 증시 뉴스 조회 ──────────────────────────────────────────────────
 
     @Override
-    @Cacheable(value = "usNews", key = "#p0")
-    public List<UsNewsDto> getUsNews(int limit) {
+    @Cacheable(value = "usNews", key = "#p0 + ':' + #p1")
+    public List<UsNewsDto> getUsNews(int limit, List<String> keywords) {
         int safeLimit = Math.min(Math.max(limit, 1), 10);
-        final int PER_SOURCE = 2;
-        log.info("미국 뉴스 조회 시작: limit={}", safeLimit);
+        final int PER_SOURCE = 4;
+        List<String> effectiveKeywords = (keywords == null || keywords.isEmpty())
+            ? defaultNewsKeywords
+            : keywords;
+        log.info("미국 뉴스 조회 시작: limit={}, keywords={}", safeLimit, effectiveKeywords);
 
         List<UsNewsDto> all = new ArrayList<>();
 
-        // 1. Google News RSS (한국어) - 미국 OR S&P500 OR 나스닥 OR 트럼프
-        String googleUrl = "https://news.google.com/rss/search"
-            + "?q=%EB%AF%B8%EA%B5%AD+OR+S%26P500+OR+%EB%82%98%EC%8A%A4%EB%8B%A5+OR+%ED%8A%B8%EB%9F%BC%ED%94%84"
-            + "&when=2d&hl=ko&gl=KR&ceid=KR:ko";
-        all.addAll(fetchAndParseGoogle(googleUrl, "https://news.google.com/", PER_SOURCE));
-
-        // 2. 다음 뉴스 경제 RSS
-        all.addAll(fetchAndParseFiltered("https://news.daum.net/rss/economy",
-            "https://news.daum.net/", "다음뉴스", PER_SOURCE));
-
-        // 3. 한국경제 글로벌비즈 RSS
-        all.addAll(fetchAndParseFiltered("https://www.hankyung.com/rss/globalBiz.xml",
-            "https://www.hankyung.com/", "한국경제", PER_SOURCE));
-
-        // 4. 연합뉴스 경제 RSS
+        // 1. 연합뉴스 경제 RSS (안정적)
         all.addAll(fetchAndParseFiltered("https://www.yna.co.kr/rss/economy.xml",
-            "https://www.yna.co.kr/", "연합뉴스", PER_SOURCE));
+            "https://www.yna.co.kr/", "연합뉴스", PER_SOURCE, effectiveKeywords));
 
-        // 5. 매일경제 글로벌 RSS
+        // 2. 매일경제 글로벌 RSS (안정적)
         all.addAll(fetchAndParseFiltered("https://www.mk.co.kr/rss/40300001/",
-            "https://www.mk.co.kr/", "매일경제", PER_SOURCE));
+            "https://www.mk.co.kr/", "매일경제", PER_SOURCE, effectiveKeywords));
 
-        // 6. 이데일리 경제 RSS
-        all.addAll(fetchAndParseFiltered("https://www.edaily.co.kr/rss/Feed?pnid=6&aid=0",
-            "https://www.edaily.co.kr/", "이데일리", PER_SOURCE));
+        // 3. KBS 경제 뉴스 RSS
+        all.addAll(fetchAndParseFiltered("https://news.kbs.co.kr/rss/economic.xml",
+            "https://news.kbs.co.kr/", "KBS뉴스", PER_SOURCE, effectiveKeywords));
+
+        // 4. 서울경제 경제 RSS
+        all.addAll(fetchAndParseFiltered("https://www.sedaily.com/RSS/rss_economy.xml",
+            "https://www.sedaily.com/", "서울경제", PER_SOURCE, effectiveKeywords));
+
+        // 5. 아시아경제 RSS
+        all.addAll(fetchAndParseFiltered("https://www.asiae.co.kr/rss/list.htm",
+            "https://www.asiae.co.kr/", "아시아경제", PER_SOURCE, effectiveKeywords));
+
+        // 6. 파이낸셜뉴스 경제 RSS
+        all.addAll(fetchAndParseFiltered("https://www.fnnews.com/rss/fn_realnews_090100.xml",
+            "https://www.fnnews.com/", "파이낸셜뉴스", PER_SOURCE, effectiveKeywords));
 
         List<UsNewsDto> result = deduplicateByTitle(all).stream()
+            .sorted((a, b) -> comparePubDateDesc(b.getPubDate(), a.getPubDate()))
             .limit(safeLimit)
             .collect(Collectors.toList());
 
@@ -1273,28 +1278,9 @@ public class NaverStockServiceImpl implements NaverStockService {
         return result;
     }
 
-    /** Google News RSS에서 뉴스 수집 */
-    private List<UsNewsDto> fetchAndParseGoogle(String url, String referer, int limit) {
-        try {
-            String xml = yahooWebClient.get()
-                .uri(url)
-                .header("Referer", referer)
-                .retrieve()
-                .bodyToMono(String.class)
-                .block();
-            if (xml != null && !xml.isBlank() && xml.contains("<item>")) {
-                List<UsNewsDto> items = parseGoogleNewsXml(xml, limit);
-                log.info("구글 뉴스 수집: {}건", items.size());
-                return items;
-            }
-        } catch (Exception e) {
-            log.warn("구글 뉴스 조회 실패: {}", e.getMessage());
-        }
-        return List.of();
-    }
-
     /** 한국 경제 RSS에서 키워드 필터링 후 뉴스 수집 */
-    private List<UsNewsDto> fetchAndParseFiltered(String url, String referer, String sourceName, int limit) {
+    private List<UsNewsDto> fetchAndParseFiltered(String url, String referer, String sourceName, int limit,
+                                                   List<String> keywords) {
         try {
             String xml = yahooWebClient.get()
                 .uri(url)
@@ -1303,7 +1289,7 @@ public class NaverStockServiceImpl implements NaverStockService {
                 .bodyToMono(String.class)
                 .block();
             if (xml != null && !xml.isBlank() && xml.contains("<item>")) {
-                List<UsNewsDto> items = parseUsNewsXmlWithFilter(xml, limit, sourceName);
+                List<UsNewsDto> items = parseUsNewsXmlWithFilter(xml, limit, sourceName, keywords);
                 log.info("{} RSS 수집: {}건", sourceName, items.size());
                 return items;
             }
@@ -1311,6 +1297,21 @@ public class NaverStockServiceImpl implements NaverStockService {
             log.warn("{} RSS 조회 실패: {}", sourceName, e.getMessage());
         }
         return List.of();
+    }
+
+    /** pubDate 문자열을 ZonedDateTime으로 변환 (파싱 실패 시 epoch 반환) */
+    private ZonedDateTime parsePubDate(String pubDate) {
+        if (pubDate == null || pubDate.isBlank()) return ZonedDateTime.ofInstant(java.time.Instant.EPOCH, ZoneId.of("UTC"));
+        try {
+            return ZonedDateTime.parse(pubDate.trim(), RSS_DATE_FORMATTER);
+        } catch (Exception e) {
+            return ZonedDateTime.ofInstant(java.time.Instant.EPOCH, ZoneId.of("UTC"));
+        }
+    }
+
+    /** pubDate 내림차순 비교 (최신순) */
+    private int comparePubDateDesc(String d1, String d2) {
+        return parsePubDate(d1).compareTo(parsePubDate(d2));
     }
 
     /** 제목 기준 중복 제거 */
@@ -1326,13 +1327,9 @@ public class NaverStockServiceImpl implements NaverStockService {
         return result;
     }
 
-    /** 한국 경제 RSS에서 미국 증시 키워드 필터링 파싱 (기본 소스명 사용) */
-    private List<UsNewsDto> parseUsNewsXmlWithFilter(String xml, int limit) {
-        return parseUsNewsXmlWithFilter(xml, limit, "다음 뉴스");
-    }
-
-    /** 한국 경제 RSS에서 미국 증시 키워드 필터링 파싱 */
-    private List<UsNewsDto> parseUsNewsXmlWithFilter(String xml, int limit, String defaultSource) {
+    /** 한국 경제 RSS에서 키워드 필터링 파싱 */
+    private List<UsNewsDto> parseUsNewsXmlWithFilter(String xml, int limit, String defaultSource,
+                                                      List<String> keywords) {
         List<UsNewsDto> result = new ArrayList<>();
         try {
             DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
@@ -1350,14 +1347,10 @@ public class NaverStockServiceImpl implements NaverStockService {
 
                 if (rawTitle.isBlank() || link.isBlank()) continue;
 
-                // 미국 증시 관련 키워드 필터
-                boolean isUsMarket = rawTitle.contains("미국") || rawTitle.contains("나스닥")
-                    || rawTitle.contains("S&P") || rawTitle.contains("S&P500")
-                    || rawTitle.contains("다우") || rawTitle.contains("뉴욕")
-                    || rawTitle.contains("월가") || rawTitle.contains("Fed")
-                    || rawTitle.contains("연준") || rawTitle.contains("NYSE")
-                    || rawTitle.contains("NASDAQ") || rawTitle.contains("트럼프");
-                if (!isUsMarket) continue;
+                // 키워드 필터 (설정 키워드 또는 기본 키워드 중 하나라도 포함 시 통과)
+                boolean matchesKeyword = keywords.stream()
+                    .anyMatch(kw -> rawTitle.contains(kw.trim()));
+                if (!matchesKeyword) continue;
                 if (!isWithinHours(pubDate, 36)) continue;
 
                 String source = defaultSource;
@@ -1377,59 +1370,6 @@ public class NaverStockServiceImpl implements NaverStockService {
             }
         } catch (Exception e) {
             log.warn("뉴스 XML 필터 파싱 실패: {}", e.getMessage());
-        }
-        return result;
-    }
-
-    /** Google News RSS XML 파싱 (한국어 기사) */
-    private List<UsNewsDto> parseGoogleNewsXml(String xml, int limit) {
-        List<UsNewsDto> result = new ArrayList<>();
-        try {
-            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
-            DocumentBuilder builder = factory.newDocumentBuilder();
-            Document doc = builder.parse(new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8)));
-            doc.getDocumentElement().normalize();
-
-            NodeList items = doc.getElementsByTagName("item");
-            for (int i = 0; i < items.getLength() && result.size() < limit; i++) {
-                Element item = (Element) items.item(i);
-
-                String rawTitle = getXmlText(item, "title");
-                String link     = getXmlText(item, "link");
-                String pubDate  = getXmlText(item, "pubDate");
-
-                if (rawTitle.isBlank() || link.isBlank()) continue;
-
-                // Google News 제목 형식: "기사 제목 - 언론사명"
-                String source = "구글 뉴스";
-                String title  = rawTitle;
-                int dashIdx = rawTitle.lastIndexOf(" - ");
-                if (dashIdx > 0) {
-                    source = rawTitle.substring(dashIdx + 3).trim();
-                    title  = rawTitle.substring(0, dashIdx).trim();
-                }
-
-                // source 태그에서 언론사명 추출 (더 정확)
-                NodeList srcNodes = item.getElementsByTagName("source");
-                if (srcNodes.getLength() > 0) {
-                    String srcText = srcNodes.item(0).getTextContent();
-                    if (srcText != null && !srcText.isBlank()) source = srcText.trim();
-                }
-
-                // 36시간 이내 뉴스만 포함 (한국시간 기준 어젯밤 미국증시 커버)
-                if (!isWithinHours(pubDate, 36)) continue;
-
-                result.add(UsNewsDto.builder()
-                    .title(title)
-                    .link(link)
-                    .pubDate(pubDate)
-                    .description("")
-                    .source(source)
-                    .build());
-            }
-        } catch (Exception e) {
-            log.warn("구글 뉴스 XML 파싱 실패: {}", e.getMessage());
         }
         return result;
     }

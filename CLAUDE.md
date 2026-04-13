@@ -1,7 +1,5 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
 ## 프로젝트 개요
 
 Java 17 + Spring Boot 3.2.5 기반 주식/ETF 분석 차트 웹앱.

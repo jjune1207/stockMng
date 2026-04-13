@@ -75,9 +75,12 @@ http://localhost:8080
 
 - **검색창**: 종목명 또는 코드 입력 (디바운스 자동완성, 코드 입력 시 차트 직행)
 - **주요 시장 지표 바**: 코스피, 코스닥, S&P500, 나스닥, 다우지수, 환율(USD/KRW), WTI 실시간 표시. 5개 지수 카드 클릭 시 차트 상세 페이지 이동
+- **미국 증시 뉴스 섹션**: 상단에 6개 RSS 소스에서 수집한 미국 증시 뉴스 가로 스크롤 카드 표시 (30분 갱신)
 - **주요 주식 탭**: 거래량 상위 주식 10개 (현재가, 등락률, 거래량)
 - **주요 ETF 탭**: 거래량 상위 ETF 10개
-- **관심 종목 탭**: 사용자가 추가한 종목/ETF 목록 (그룹별 분류)
+- **미국 주식 탭**: S&P500 상위 10개 (USD/KRW 토글)
+- **미국 ETF 탭**: 주요 ETF 15개 (USD/KRW 토글)
+- **관심 종목 탭**: 사용자가 추가한 종목/ETF 목록 (그룹별 분류, USD/KRW 토글)
   - **그룹 필터**: 그룹 탭 클릭으로 필터링, 드래그&드롭으로 순서 변경 (localStorage 저장)
   - **그룹 관리**: 그룹 추가(인라인 입력) / 삭제 / 이름 변경
   - **중복 등록**: 같은 종목을 여러 그룹에 등록 가능 (복합키 `symbol|group`)
@@ -226,6 +229,7 @@ stockMng/
 │   │   ├── StockPriceDto.java            # currency(KRW/USD) 필드 포함
 │   │   ├── StockSearchDto.java
 │   │   ├── MarketIndicatorDto.java       # 시장 지표 DTO
+│   │   ├── UsNewsDto.java               # 미국 뉴스 DTO
 │   │   ├── WatchlistItemDto.java
 │   │   └── WatchlistRequestDto.java
 │   ├── exception/

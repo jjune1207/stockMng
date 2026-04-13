@@ -72,10 +72,11 @@ public interface NaverStockService {
     List<MarketIndicatorDto> getMarketIndicators();
 
     /**
-     * 미국 증시 주요 뉴스 조회 (Yahoo Finance RSS)
+     * 미국 증시 주요 뉴스 조회 (한국 경제 RSS 필터링)
      *
-     * @param limit 최대 건수 (최대 10)
+     * @param limit    최대 건수 (최대 10)
+     * @param keywords 필터 키워드 목록 (비어있으면 application.yml 기본값 사용)
      * @return 뉴스 리스트
      */
-    List<UsNewsDto> getUsNews(int limit);
+    List<UsNewsDto> getUsNews(int limit, List<String> keywords);
 }

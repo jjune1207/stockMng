@@ -50,8 +50,8 @@ public class StockDataFacade {
         return naverStockService.getMarketIndicators();
     }
 
-    public List<UsNewsDto> getUsNews(int limit) {
-        return naverStockService.getUsNews(limit);
+    public List<UsNewsDto> getUsNews(int limit, List<String> keywords) {
+        return naverStockService.getUsNews(limit, keywords);
     }
 
     public List<WatchlistItemDto> getWatchlist() {
