@@ -44,4 +44,7 @@ public class StockPriceDto {
     /** 통화 (KRW: 한국, USD: 미국) */
     @Builder.Default
     private String currency = "KRW";
+
+    /** 한글 설명 (미국 ETF 전용, 없으면 null) */
+    private String description;
 }

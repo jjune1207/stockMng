@@ -306,9 +306,21 @@ body {
 }
 
 [data-bs-theme="light"] .scroll-arrow {
-    background: rgba(255, 255, 255, 0.8);
-    border-color: rgba(0, 0, 0, 0.12);
-    color: #495057;
+    background: rgba(80, 90, 100, 0.22) !important;
+    border-color: rgba(0, 0, 0, 0.3) !important;
+    color: #212529 !important;
+}
+
+.watchlist-group-tag {
+    color: #adb5bd;
+    background-color: rgba(255, 255, 255, 0.08);
+    border-color: rgba(173, 181, 189, 0.5) !important;
+}
+
+body[data-bs-theme="light"] .watchlist-group-tag {
+    color: #495057 !important;
+    background-color: #e9ecef !important;
+    border-color: #adb5bd !important;
 }
 
 [data-bs-theme="light"] .scroll-arrow:hover {
@@ -363,12 +375,20 @@ body {
 }
 
 [data-bs-theme="light"] .group-filter-btn:not(.btn-warning) {
+    --bs-btn-color: #495057;
+    --bs-btn-bg: transparent;
+    --bs-btn-border-color: #6c757d;
     color: #495057 !important;
+    background-color: transparent !important;
     border-color: #6c757d !important;
 }
 
 [data-bs-theme="light"] .search-item:hover {
     background-color: rgba(0, 0, 0, 0.05) !important;
+}
+
+[data-bs-theme="light"] .badge.text-body {
+    color: #212529 !important;
 }
 
 [data-bs-theme="light"] .price-up   { color: #dc3545 !important; }
@@ -410,7 +430,7 @@ body {
     overflow-x: auto;
     scroll-snap-type: x mandatory;
     -webkit-overflow-scrolling: touch;
-    padding-bottom: 6px;
+    padding: 0 28px 6px;
 }
 
 .us-news-scroll::-webkit-scrollbar {

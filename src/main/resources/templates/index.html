@@ -112,7 +112,7 @@
     <div class="us-news-section mb-3" id="usNewsSection">
         <div class="d-flex align-items-center justify-content-between mb-2">
             <h6 class="mb-0 text-secondary fw-semibold">
-                <i class="bi bi-newspaper me-1"></i>미국 주요뉴스
+                <i class="bi bi-newspaper me-1"></i>주요뉴스
                 <span id="newsKeywordBadges"></span>
             </h6>
             <div class="d-flex align-items-center gap-2">
@@ -149,22 +149,26 @@
                 </div>
             </div>
         </div>
-        <div class="us-news-scroll" id="usNewsList">
-            <div class="us-news-card skeleton-news">
-                <div class="skeleton-line short mb-2" style="height:10px;width:30%"></div>
-                <div class="skeleton-line long mb-1" style="height:14px;width:90%"></div>
-                <div class="skeleton-line long" style="height:12px;width:70%"></div>
+        <div class="border rounded position-relative" id="usNewsScrollWrap" style="overflow:hidden">
+            <button class="scroll-arrow scroll-arrow-left" id="newsScrollLeft" onclick="scrollUsNews(-1)" aria-label="이전">&#8249;</button>
+            <div class="us-news-scroll" id="usNewsList">
+                <div class="us-news-card skeleton-news">
+                    <div class="skeleton-line short mb-2" style="height:10px;width:30%"></div>
+                    <div class="skeleton-line long mb-1" style="height:14px;width:90%"></div>
+                    <div class="skeleton-line long" style="height:12px;width:70%"></div>
+                </div>
+                <div class="us-news-card skeleton-news">
+                    <div class="skeleton-line short mb-2" style="height:10px;width:30%"></div>
+                    <div class="skeleton-line long mb-1" style="height:14px;width:90%"></div>
+                    <div class="skeleton-line long" style="height:12px;width:70%"></div>
+                </div>
+                <div class="us-news-card skeleton-news">
+                    <div class="skeleton-line short mb-2" style="height:10px;width:30%"></div>
+                    <div class="skeleton-line long mb-1" style="height:14px;width:90%"></div>
+                    <div class="skeleton-line long" style="height:12px;width:70%"></div>
+                </div>
             </div>
-            <div class="us-news-card skeleton-news">
-                <div class="skeleton-line short mb-2" style="height:10px;width:30%"></div>
-                <div class="skeleton-line long mb-1" style="height:14px;width:90%"></div>
-                <div class="skeleton-line long" style="height:12px;width:70%"></div>
-            </div>
-            <div class="us-news-card skeleton-news">
-                <div class="skeleton-line short mb-2" style="height:10px;width:30%"></div>
-                <div class="skeleton-line long mb-1" style="height:14px;width:90%"></div>
-                <div class="skeleton-line long" style="height:12px;width:70%"></div>
-            </div>
+            <button class="scroll-arrow scroll-arrow-right" id="newsScrollRight" onclick="scrollUsNews(1)" aria-label="다음">&#8250;</button>
         </div>
     </div>
 
@@ -435,7 +439,7 @@
     function formatIndicatorValue(id, value) {
         if (value === 0 || value === null || value === undefined) return '-';
         if (id === 'USDKRW') return value.toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        if (id === 'WTI' || id === 'SP500' || id === 'NASDAQ' || id === 'DJI') {
+        if (id === 'WTI' || id === 'SP500' || id === 'NASDAQ' || id === 'DJI' || id === 'GOLD' || id === 'SILVER') {
             return value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
         return value.toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -621,6 +625,12 @@
             indicatorBar.classList.toggle('border-secondary', isDark);
             indicatorBar.classList.toggle('border-light-subtle', !isDark);
         }
+        // 뉴스 스크롤 래퍼 테마 전환
+        const newsWrap = document.getElementById('usNewsScrollWrap');
+        if (newsWrap) {
+            newsWrap.classList.toggle('border-secondary', isDark);
+            newsWrap.classList.toggle('border-light-subtle', !isDark);
+        }
 
         localStorage.setItem('theme', theme);
 
@@ -742,16 +752,23 @@
         }
     }
 
-    // ── 뉴스 설정 (localStorage 영속화) ────────────────────────────────────
-    const NEWS_SETTINGS_KEY = 'stockmng_news_settings';
+    // ── 뉴스 설정 (서버 news-keywords.json 영속화) ─────────────────────────
+    const NEWS_INTERVAL_KEY = 'stockmng_news_interval';
     let newsSettings = { keywords: [], interval: 1800 };
 
-    function loadNewsSettings() {
+    async function loadNewsSettings() {
+        // 갱신 주기는 localStorage 유지 (개인 설정)
         try {
-            const saved = localStorage.getItem(NEWS_SETTINGS_KEY);
-            if (saved) newsSettings = { ...newsSettings, ...JSON.parse(saved) };
-        } catch (e) { /* localStorage 접근 실패 시 기본값 사용 */ }
-        // 설정 패널 초기값 반영
+            const saved = localStorage.getItem(NEWS_INTERVAL_KEY);
+            if (saved) newsSettings.interval = parseInt(saved, 10) || 1800;
+        } catch (e) { /* 기본값 사용 */ }
+
+        // 키워드는 서버에서 로드
+        try {
+            const res = await fetch('/api/stock/news-keywords');
+            if (res.ok) newsSettings.keywords = await res.json();
+        } catch (e) { /* 기본값 유지 */ }
+
         const kwInput  = document.getElementById('newsKeywordInput');
         const ivSelect = document.getElementById('newsIntervalSelect');
         if (kwInput)  kwInput.value  = newsSettings.keywords.join(', ');
@@ -759,13 +776,28 @@
         renderKeywordBadges();
     }
 
-    function saveNewsSettings() {
+    async function saveNewsSettings() {
         const kwInput  = document.getElementById('newsKeywordInput');
         const ivSelect = document.getElementById('newsIntervalSelect');
         const rawKw = kwInput ? kwInput.value : '';
-        newsSettings.keywords = rawKw.split(',').map(k => k.trim()).filter(k => k.length > 0);
+        const newKeywords = rawKw.split(',').map(k => k.trim()).filter(k => k.length > 0);
         newsSettings.interval = ivSelect ? parseInt(ivSelect.value, 10) : 1800;
-        try { localStorage.setItem(NEWS_SETTINGS_KEY, JSON.stringify(newsSettings)); } catch (e) {}
+
+        // 키워드 서버 저장
+        try {
+            const res = await fetch('/api/stock/news-keywords', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newKeywords)
+            });
+            if (res.ok) newsSettings.keywords = await res.json();
+        } catch (e) {
+            newsSettings.keywords = newKeywords;
+        }
+
+        // 갱신 주기 localStorage 저장
+        try { localStorage.setItem(NEWS_INTERVAL_KEY, String(newsSettings.interval)); } catch (e) {}
+
         renderKeywordBadges();
         toggleNewsSettings();
         newsCountdown = newsSettings.interval;
@@ -802,7 +834,7 @@
             const kwParam = newsSettings.keywords.length
                 ? '&keywords=' + encodeURIComponent(newsSettings.keywords.join(','))
                 : '';
-            const res = await fetch('/api/stock/us-news?limit=10' + kwParam);
+            const res = await fetch('/api/stock/news?limit=10' + kwParam);
             if (!res.ok) throw new Error('뉴스 조회 실패');
             const news = await res.json();
             if (!news || news.length === 0) {
@@ -919,7 +951,7 @@
     }
 
     function groupInactiveClass() {
-        return getStoredTheme() === 'dark' ? 'btn-outline-secondary' : 'btn-outline-dark';
+        return 'btn-outline-secondary';
     }
 
     function renderGroupFilter() {
@@ -1133,7 +1165,7 @@
         if (displayCurrency === 'KRW' && usdKrwRate > 0) {
             return formatNumber(Math.round(usd * usdKrwRate)) + '원';
         }
-        return '$' + usd.toFixed(2);
+        return '$' + usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
     function fmtUsChangeCell(rawChange, displayCurrency) {
@@ -1141,7 +1173,7 @@
         if (displayCurrency === 'KRW' && usdKrwRate > 0) {
             return formatNumber(Math.round(usd * usdKrwRate));
         }
-        return '$' + usd.toFixed(2);
+        return '$' + usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
     function buildTopRow(price, item) {
@@ -1192,7 +1224,7 @@
 
     function buildGroupBadges(symbol) {
         const groups = watchlistPriceCache.filter(r => r.item.symbol === symbol).map(r => r.item.group);
-        return groups.map(g => '<span class="badge bg-outline-secondary border border-secondary me-1" style="font-size:0.7rem">' + escHtml(g) + '</span>').join('');
+        return groups.map(g => '<span class="border rounded me-1 px-2 watchlist-group-tag" style="font-size:0.7rem;display:inline-block;line-height:1.6">' + escHtml(g) + '</span>').join('');
     }
 
     const ETF_NAME_RE = /KODEX|TIGER|KOSEF|ARIRANG|ACE|RISE|SOL|HANARO|KBSTAR|ETF|ETN/i;
@@ -1227,8 +1259,12 @@
             ? '<button class="btn btn-sm btn-outline-danger" data-action="remove-watch" data-symbol="' + escHtml(item.symbol) + '">삭제</button>'
             : '<button class="btn btn-sm btn-outline-danger" data-action="remove-watch" data-symbol="' + escHtml(item.symbol + '|' + item.group) + '">삭제</button>';
 
+        const watchlistNameCell = price.description
+            ? escHtml(price.name || item.name) + '<br><small class="text-secondary" style="font-size:0.72rem">' + escHtml(price.description) + '</small>'
+            : escHtml(price.name || item.name);
+
         return '<tr>' +
-            '<td class="fw-semibold">' + escHtml(price.name || item.name) + '</td>' +
+            '<td class="fw-semibold">' + watchlistNameCell + '</td>' +
             '<td class="text-secondary font-monospace small">' + escHtml(item.symbol) + '</td>' +
             '<td>' + buildTypeBadge(item, price) + '</td>' +
             groupCell +
@@ -1347,6 +1383,12 @@
     function scrollIndicator(dir) {
         const el = document.getElementById('marketIndicatorList');
         if (el) el.scrollBy({ left: dir * 240, behavior: 'smooth' });
+    }
+
+    // 미국 뉴스 화살표 스크롤
+    function scrollUsNews(dir) {
+        const el = document.getElementById('usNewsList');
+        if (el) el.scrollBy({ left: dir * 280, behavior: 'smooth' });
     }
 
     // 마우스 휠을 가로 스크롤로 변환
@@ -1657,12 +1699,12 @@
         const badge = currency === 'USD'
             ? '<span class="badge bg-warning text-dark ms-1" style="font-size:0.65rem;vertical-align:middle">USD</span>'
             : '<span class="badge bg-primary ms-1" style="font-size:0.65rem;vertical-align:middle">KRW</span>';
-        if (currency === 'USD') return '$' + (rawValue / 100).toFixed(2) + badge;
+        if (currency === 'USD') return '$' + (rawValue / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + badge;
         return formatNumber(rawValue) + '원' + badge;
     }
 
     function fmtChangeCell(rawChange, currency) {
-        if (currency === 'USD') return '$' + Math.abs(rawChange / 100).toFixed(2);
+        if (currency === 'USD') return '$' + Math.abs(rawChange / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         return formatNumber(Math.abs(rawChange));
     }
 
@@ -1725,7 +1767,7 @@
 
     async function initialize() {
         loadStockSettings(); // 주식·차트 갱신 주기 복원
-        loadNewsSettings(); // 뉴스 설정 복원 (카운트다운보다 먼저)
+        await loadNewsSettings(); // 뉴스 키워드 서버에서 로드 (카운트다운보다 먼저)
         bindEvents();
         await loadMarketIndicators(); // 환율 먼저 로드 (USD/KRW 변환에 필요)
         loadUsNews(); // 뉴스는 병렬로 로드

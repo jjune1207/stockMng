@@ -7,6 +7,7 @@ import com.example.stockchart.dto.StockSearchDto;
 import com.example.stockchart.dto.UsNewsDto;
 import com.example.stockchart.exception.StockApiException;
 import com.example.stockchart.service.NaverStockService;
+import com.example.stockchart.service.NewsKeywordsService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -50,14 +51,17 @@ public class NaverStockServiceImpl implements NaverStockService {
     private final WebClient naverWebClient;
     private final WebClient yahooWebClient;
     private final ObjectMapper objectMapper;
+    private final NewsKeywordsService newsKeywordsService;
 
     public NaverStockServiceImpl(
             @Qualifier("naverWebClient") WebClient naverWebClient,
             @Qualifier("yahooWebClient") WebClient yahooWebClient,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            NewsKeywordsService newsKeywordsService) {
         this.naverWebClient = naverWebClient;
         this.yahooWebClient = yahooWebClient;
         this.objectMapper = objectMapper;
+        this.newsKeywordsService = newsKeywordsService;
     }
 
     @Value("${naver.stock-basic-url}")
@@ -65,9 +69,6 @@ public class NaverStockServiceImpl implements NaverStockService {
 
     @Value("${naver.etf-basic-url}")
     private String etfBasicUrl;
-
-    @Value("#{'${news.default-keywords}'.split(',')}")
-    private List<String> defaultNewsKeywords;
 
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyyMMdd");
     private static final Pattern TABLE_ROW_PATTERN = Pattern.compile(
@@ -83,6 +84,28 @@ public class NaverStockServiceImpl implements NaverStockService {
     private static final Pattern ROW_PATTERN = Pattern.compile(
         "\\[\"(\\d{8})\"\\s*,\\s*([\\d.]+)\\s*,\\s*([\\d.]+)\\s*,\\s*([\\d.]+)\\s*,\\s*([\\d.]+)\\s*,\\s*([\\d.]+)"
     );
+
+    /** 미국 ETF 심볼 → 한글 설명 매핑 */
+    private static final Map<String, String> US_ETF_DESCRIPTIONS;
+    static {
+        Map<String, String> m = new LinkedHashMap<>();
+        m.put("VTI",  "미국 전체 주식 시장");
+        m.put("SPY",  "미국 500대 기업 지도");
+        m.put("VOO",  "SPY 쌍둥이, 더 저렴한 버전");
+        m.put("SPYM", "가성비 S&P500 ETF");
+        m.put("QQQ",  "나스닥 기술주 로켓 100");
+        m.put("QQQM", "QQQ의 귀여운 동생");
+        m.put("SOXX", "반도체 엔진 모음");
+        m.put("SCHD", "꾸준한 배당나무");
+        m.put("DIVO", "배당성장 선구자");
+        m.put("JEPI", "대형주 배당 ETF");
+        m.put("JEPQ", "기술주 배당 ETF");
+        m.put("TLT",  "장기국채 ETF (30년)");
+        m.put("XLF",  "금융 심장 섹터 ETF");
+        m.put("VNQ",  "미국 건물주 리츠");
+        m.put("GLDM", "금(Gold) ETF");
+        US_ETF_DESCRIPTIONS = Collections.unmodifiableMap(m);
+    }
 
     /** 대표 지수 ID → Yahoo Finance 심볼 매핑 (차트 상세 페이지 지원) */
     private static final Map<String, String> INDEX_YAHOO_SYMBOLS = Map.of(
@@ -288,7 +311,13 @@ public class NaverStockServiceImpl implements NaverStockService {
         if (isOverseasSymbol(symbol)) {
             log.info("해외 종목 현재가 조회 (Yahoo Finance): symbol={}", symbol);
             StockPriceDto price = fetchYahooCurrentPrice(resolveYahooSymbol(symbol));
-            if (price != null) return price;
+            if (price != null) {
+                String desc = US_ETF_DESCRIPTIONS.get(symbol.toUpperCase());
+                if (desc != null) {
+                    price.setDescription(desc);
+                }
+                return price;
+            }
             throw new StockApiException("해외 종목 현재가 조회 실패: " + symbol, 404);
         }
 
@@ -426,6 +455,8 @@ public class NaverStockServiceImpl implements NaverStockService {
         result.add(fetchNaverForeignIndexIndicator(".DJI", "DJI", "다우지수", "^DJI"));
         result.add(fetchNaverMarketIndexIndicator("exchange", "FX_USDKRW", "USDKRW", "환율 (USD/KRW)"));
         result.add(fetchNaverMarketIndexIndicator("energy", "CLcv1", "WTI", "WTI 유가"));
+        result.add(fetchYahooCommodityIndicator("GC=F", "GOLD", "금 (Gold)"));
+        result.add(fetchYahooCommodityIndicator("SI=F", "SILVER", "은 (Silver)"));
 
         return result.stream().filter(Objects::nonNull).toList();
     }
@@ -619,6 +650,47 @@ public class NaverStockServiceImpl implements NaverStockService {
         } catch (Exception e) {
             log.debug("시장 지표 히스토리 조회 실패: category={}, reutersCode={}", category, reutersCode);
             return Collections.emptyList();
+        }
+    }
+
+    /** Yahoo Finance를 통한 원자재(금·은) 지표 조회 */
+    private MarketIndicatorDto fetchYahooCommodityIndicator(String yahooSymbol, String id, String name) {
+        try {
+            String response = yahooWebClient.get()
+                .uri(uriBuilder -> uriBuilder
+                    .scheme("https")
+                    .host("query1.finance.yahoo.com")
+                    .path("/v8/finance/chart/{symbol}")
+                    .queryParam("interval", "1d")
+                    .queryParam("range", "5d")
+                    .build(yahooSymbol))
+                .retrieve()
+                .bodyToMono(String.class)
+                .block();
+
+            if (response == null || response.isBlank()) return buildEmptyIndicator(id, name);
+
+            JsonNode root = objectMapper.readTree(response);
+            JsonNode result = root.path("chart").path("result");
+            if (!result.isArray() || result.isEmpty()) return buildEmptyIndicator(id, name);
+
+            JsonNode meta = result.get(0).path("meta");
+            double price = meta.path("regularMarketPrice").asDouble(0);
+            double prevClose = meta.path("chartPreviousClose").asDouble(0);
+            double change = price - prevClose;
+            double changeRate = prevClose > 0 ? (change / prevClose) * 100 : 0;
+
+            List<Double> history = fetchYahooIndexHistory(yahooSymbol);
+
+            return MarketIndicatorDto.builder()
+                .id(id).name(name)
+                .currentValue(price).change(change).changeRate(changeRate)
+                .history(history)
+                .build();
+
+        } catch (Exception e) {
+            log.warn("Yahoo 원자재 지표 조회 실패: symbol={}, error={}", yahooSymbol, e.getMessage());
+            return buildEmptyIndicator(id, name);
         }
     }
 
@@ -1239,7 +1311,7 @@ public class NaverStockServiceImpl implements NaverStockService {
         int safeLimit = Math.min(Math.max(limit, 1), 10);
         final int PER_SOURCE = 4;
         List<String> effectiveKeywords = (keywords == null || keywords.isEmpty())
-            ? defaultNewsKeywords
+            ? newsKeywordsService.getKeywords()
             : keywords;
         log.info("미국 뉴스 조회 시작: limit={}, keywords={}", safeLimit, effectiveKeywords);
 
@@ -1258,15 +1330,15 @@ public class NaverStockServiceImpl implements NaverStockService {
             "https://news.kbs.co.kr/", "KBS뉴스", PER_SOURCE, effectiveKeywords));
 
         // 4. 서울경제 경제 RSS
-        all.addAll(fetchAndParseFiltered("https://www.sedaily.com/RSS/rss_economy.xml",
+        all.addAll(fetchAndParseFiltered("https://www.sedaily.com/rss/economy",
             "https://www.sedaily.com/", "서울경제", PER_SOURCE, effectiveKeywords));
 
-        // 5. 아시아경제 RSS
-        all.addAll(fetchAndParseFiltered("https://www.asiae.co.kr/rss/list.htm",
+        // 5. 아시아경제 경제 RSS
+        all.addAll(fetchAndParseFiltered("https://www.asiae.co.kr/rss/economy.htm",
             "https://www.asiae.co.kr/", "아시아경제", PER_SOURCE, effectiveKeywords));
 
         // 6. 파이낸셜뉴스 경제 RSS
-        all.addAll(fetchAndParseFiltered("https://www.fnnews.com/rss/fn_realnews_090100.xml",
+        all.addAll(fetchAndParseFiltered("https://www.fnnews.com/rss/r20/fn_realnews_economy.xml",
             "https://www.fnnews.com/", "파이낸셜뉴스", PER_SOURCE, effectiveKeywords));
 
         List<UsNewsDto> result = deduplicateByTitle(all).stream()
@@ -1303,10 +1375,15 @@ public class NaverStockServiceImpl implements NaverStockService {
     private ZonedDateTime parsePubDate(String pubDate) {
         if (pubDate == null || pubDate.isBlank()) return ZonedDateTime.ofInstant(java.time.Instant.EPOCH, ZoneId.of("UTC"));
         try {
-            return ZonedDateTime.parse(pubDate.trim(), RSS_DATE_FORMATTER);
+            return ZonedDateTime.parse(normalizeRssDate(pubDate), RSS_DATE_FORMATTER);
         } catch (Exception e) {
             return ZonedDateTime.ofInstant(java.time.Instant.EPOCH, ZoneId.of("UTC"));
         }
+    }
+
+    /** RSS pubDate 정규화: "Tue,14 Apr..." → "Tue, 14 Apr..." (쉼표 뒤 공백 누락 보정) */
+    private String normalizeRssDate(String pubDate) {
+        return pubDate.trim().replaceAll("^(\\w{3}),(\\S)", "$1, $2");
     }
 
     /** pubDate 내림차순 비교 (최신순) */
@@ -1379,13 +1456,17 @@ public class NaverStockServiceImpl implements NaverStockService {
      * 파싱 실패 시 포함(true) 처리.
      * 지원 형식: "Mon, 10 Apr 2026 03:30:00 GMT" / "+0000" 등
      */
-    private static final DateTimeFormatter RSS_DATE_FORMATTER =
-        DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss z", Locale.ENGLISH);
+    /** RSS pubDate 파서: "Mon, 10 Apr 2026 03:30:00 GMT" 및 "+0900" 오프셋 형식 모두 허용 */
+    private static final DateTimeFormatter RSS_DATE_FORMATTER = new java.time.format.DateTimeFormatterBuilder()
+        .appendPattern("EEE, dd MMM yyyy HH:mm:ss")
+        .optionalStart().appendPattern(" z").optionalEnd()   // GMT, UTC 등 이름형
+        .optionalStart().appendPattern(" Z").optionalEnd()   // +0900, -0500 등 오프셋형
+        .toFormatter(Locale.ENGLISH);
 
     private boolean isWithinHours(String pubDate, int hours) {
         if (pubDate == null || pubDate.isBlank()) return true;
         try {
-            ZonedDateTime pub = ZonedDateTime.parse(pubDate.trim(), RSS_DATE_FORMATTER);
+            ZonedDateTime pub = ZonedDateTime.parse(normalizeRssDate(pubDate), RSS_DATE_FORMATTER);
             ZonedDateTime cutoff = ZonedDateTime.now(ZoneId.of("Asia/Seoul")).minusHours(hours);
             return pub.isAfter(cutoff);
         } catch (Exception e) {

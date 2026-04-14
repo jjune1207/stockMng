@@ -22,6 +22,7 @@ public class StockDataFacade {
 
     private final NaverStockService naverStockService;
     private final WatchlistService watchlistService;
+    private final NewsKeywordsService newsKeywordsService;
 
     public StockPriceDto getCurrentPrice(String symbol) {
         return naverStockService.getCurrentPrice(symbol);
@@ -52,6 +53,14 @@ public class StockDataFacade {
 
     public List<UsNewsDto> getUsNews(int limit, List<String> keywords) {
         return naverStockService.getUsNews(limit, keywords);
+    }
+
+    public List<String> getNewsKeywords() {
+        return newsKeywordsService.getKeywords();
+    }
+
+    public List<String> updateNewsKeywords(List<String> keywords) {
+        return newsKeywordsService.updateKeywords(keywords);
     }
 
     public List<WatchlistItemDto> getWatchlist() {

@@ -106,7 +106,7 @@ public class StockApiController {
         return ResponseEntity.ok(stockDataFacade.getMarketIndicators());
     }
 
-    @GetMapping("/us-news")
+    @GetMapping("/news")
     public ResponseEntity<List<UsNewsDto>> getUsNews(
         @RequestParam(name = "limit", defaultValue = "10") int limit,
         @RequestParam(name = "keywords", required = false, defaultValue = "") String keywordsParam) {
@@ -115,8 +115,20 @@ public class StockApiController {
             : List.of(keywordsParam.split(",")).stream()
                 .map(String::trim).filter(k -> !k.isBlank())
                 .toList();
-        log.info("REST 미국 뉴스 요청: limit={}, keywords={}", limit, keywords);
+        log.info("REST 주요 뉴스 요청: limit={}, keywords={}", limit, keywords);
         return ResponseEntity.ok(stockDataFacade.getUsNews(limit, keywords));
+    }
+
+    @GetMapping("/news-keywords")
+    public ResponseEntity<List<String>> getNewsKeywords() {
+        log.info("REST 뉴스 키워드 조회 요청");
+        return ResponseEntity.ok(stockDataFacade.getNewsKeywords());
+    }
+
+    @PutMapping("/news-keywords")
+    public ResponseEntity<List<String>> updateNewsKeywords(@RequestBody List<String> keywords) {
+        log.info("REST 뉴스 키워드 업데이트 요청: {}개", keywords.size());
+        return ResponseEntity.ok(stockDataFacade.updateNewsKeywords(keywords));
     }
 
     @GetMapping("/usdkrw-rate")

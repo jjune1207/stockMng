@@ -368,6 +368,16 @@ async function loadPriceInfo(symbol) {
         rawPriceData = data;
         document.getElementById('stockName').textContent = data.name || symbol;
 
+        var descEl = document.getElementById('stockDescription');
+        if (descEl) {
+            if (data.description) {
+                descEl.textContent = data.description;
+                descEl.style.display = '';
+            } else {
+                descEl.style.display = 'none';
+            }
+        }
+
         if (currentCurrency === 'USD') {
             await fetchUsdKrwRate();
             showCurrencyToggle(displayCurrency);

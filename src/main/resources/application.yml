@@ -14,9 +14,6 @@ naver:
   stock-basic-url: https://m.stock.naver.com/api/stock
   etf-basic-url: https://m.stock.naver.com/api/etf
 
-news:
-  default-keywords: 미국,나스닥,S&P,S&P500,다우,뉴욕,월가,Fed,연준,NYSE,NASDAQ,트럼프
-
 cache:
   candle-ttl-minutes: 10
   price-ttl-seconds: 30
