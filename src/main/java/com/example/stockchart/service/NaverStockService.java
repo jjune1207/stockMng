@@ -65,6 +65,15 @@ public interface NaverStockService {
     List<StockSearchDto> getUsPopular(String type, int limit);
 
     /**
+     * 국내 인기 종목/ETF 목록 조회 (고정 리스트 — 코스피 시총 상위 10 / 국내 인기 ETF 15)
+     *
+     * @param type stock 또는 etf
+     * @param limit 최대 건수
+     * @return 국내 인기 종목 목록
+     */
+    List<StockSearchDto> getDomesticPopular(String type, int limit);
+
+    /**
      * 주요 시장 지표 조회 (코스피, 코스닥, 환율, WTI, S&P 500, 나스닥, 다우지수)
      *
      * @return 시장 지표 리스트 (스파크라인 히스토리 포함)

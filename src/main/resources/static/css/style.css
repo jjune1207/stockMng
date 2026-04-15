@@ -1,3 +1,5 @@
+@charset "UTF-8";
+
 /* ──────────────────────────────────────────
    공통 스타일
 ────────────────────────────────────────── */
@@ -142,57 +144,26 @@ body {
 }
 
 .scroll-arrow {
-    position: absolute;
-    top: 50%;
-    transform: translateY(-50%);
-    z-index: 10;
-    background: rgba(0, 0, 0, 0.55);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    color: #adb5bd;
-    width: 28px;
-    height: 44px;
-    font-size: 1.4rem;
-    line-height: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: background 0.15s, color 0.15s;
-    padding: 0;
+    display: none !important;
 }
 
-.scroll-arrow:hover {
-    background: rgba(255, 193, 7, 0.25);
-    color: #ffc107;
-    border-color: rgba(255, 193, 7, 0.4);
-}
-
-.scroll-arrow-left  { left: 0;  border-radius: 6px 0 0 6px; border-left: none; }
-.scroll-arrow-right { right: 0; border-radius: 0 6px 6px 0; border-right: none; }
 
 .market-indicator-scroll {
     display: flex;
     flex-direction: row;
     gap: 0;
-    overflow-x: auto;
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-    scroll-behavior: smooth;
-}
-
-.market-indicator-scroll::-webkit-scrollbar {
-    display: none;
+    overflow: hidden;
+    width: 100%;
 }
 
 .market-indicator-card {
     display: flex;
     flex-direction: column;
-    min-width: 210px;
-    max-width: 260px;
-    padding: 16px 24px;
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 10px 12px;
     border-right: 1px solid rgba(255, 255, 255, 0.08);
     cursor: default;
-    flex-shrink: 0;
     transition: background 0.15s;
 }
 
@@ -212,31 +183,36 @@ body {
 }
 
 .indicator-name {
-    font-size: 0.85rem;
+    font-size: 0.78rem;
     font-weight: 600;
     color: #adb5bd;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    letter-spacing: 0.02em;
+    letter-spacing: 0.01em;
 }
 
 .indicator-value {
-    font-size: 1.5rem;
+    font-size: 1.1rem;
     font-weight: 700;
     color: #f8f9fa;
     line-height: 1.2;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .indicator-change {
-    font-size: 0.85rem;
+    font-size: 0.75rem;
     font-weight: 500;
-    margin-bottom: 6px;
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .indicator-rate {
-    font-size: 0.82rem;
+    font-size: 0.75rem;
     font-weight: 600;
     white-space: nowrap;
 }
@@ -253,8 +229,8 @@ body {
 .indicator-spark {
     display: block;
     width: 100%;
-    height: 48px;
-    margin-top: 6px;
+    height: 36px;
+    margin-top: 4px;
 }
 
 /* 스켈레톤 로딩 */
@@ -305,12 +281,6 @@ body {
     border-right-color: rgba(0, 0, 0, 0.08);
 }
 
-[data-bs-theme="light"] .scroll-arrow {
-    background: rgba(80, 90, 100, 0.22) !important;
-    border-color: rgba(0, 0, 0, 0.3) !important;
-    color: #212529 !important;
-}
-
 .watchlist-group-tag {
     color: #adb5bd;
     background-color: rgba(255, 255, 255, 0.08);
@@ -321,12 +291,6 @@ body[data-bs-theme="light"] .watchlist-group-tag {
     color: #495057 !important;
     background-color: #e9ecef !important;
     border-color: #adb5bd !important;
-}
-
-[data-bs-theme="light"] .scroll-arrow:hover {
-    background: rgba(255, 193, 7, 0.2);
-    color: #856404;
-    border-color: rgba(255, 193, 7, 0.5);
 }
 
 [data-bs-theme="light"] .market-indicator-card:hover {

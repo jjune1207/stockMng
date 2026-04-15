@@ -378,7 +378,7 @@ public class NaverStockServiceImpl implements NaverStockService {
     @Cacheable(value = "topRanking", key = "#p0 + ':' + #p1")
     public List<StockSearchDto> getTopByVolume(String type, int limit) {
         String normalizedType = "etf".equalsIgnoreCase(type) ? "etf" : "stock";
-        int safeLimit = Math.min(Math.max(limit, 1), 10);
+        int safeLimit = Math.min(Math.max(limit, 1), 20);
         int candidateSize = normalizedType.equals("etf") ? 50 : 30;
 
         List<StockSearchDto> candidates = fetchVolumeCandidates(normalizedType, candidateSize);
@@ -436,6 +436,64 @@ public class NaverStockServiceImpl implements NaverStockService {
                 .symbol(arr[0])
                 .name(arr[1])
                 .market("NASDAQ")
+                .type(normalizedType)
+                .description(arr.length > 2 ? arr[2] : null)
+                .build())
+            .toList();
+    }
+
+    @Override
+    @Cacheable(value = "domesticPopular", key = "#p0 + ':' + #p1")
+    public List<StockSearchDto> getDomesticPopular(String type, int limit) {
+        int safeLimit = Math.min(Math.max(limit, 1), 20);
+        boolean isEtf = "etf".equalsIgnoreCase(type);
+
+        // symbol, name, description
+        List<String[]> list = isEtf
+            ? List.of(
+                // ── 국내 지수 ──────────────────────────────────────────
+                new String[]{"069500", "KODEX 200",                     "코스피200 국민 대표 ETF"},
+                new String[]{"102110", "TIGER 200",                     "KODEX 200의 저비용 쌍둥이"},
+                new String[]{"229200", "KODEX 코스닥150",               "코스닥 상위 150종목 추종"},
+                // ── 해외 지수 ──────────────────────────────────────────
+                new String[]{"360750", "TIGER 미국S&P500",              "S&P500 환노출, 장기 우상향"},
+                new String[]{"133690", "TIGER 나스닥100",               "나스닥 기술주 국내판"},
+                new String[]{"379800", "KODEX 미국S&P500TR(H)",         "S&P500 배당 자동재투자+환헤지"},
+                new String[]{"367380", "ACE 미국나스닥100",              "나스닥100 저비용 국내 추종"},
+                // ── 섹터 ───────────────────────────────────────────────
+                new String[]{"091160", "KODEX 반도체",                   "국내 반도체 대표주 집합"},
+                new String[]{"305720", "TIGER 2차전지테마",              "배터리 혁명 테마 ETF"},
+                new String[]{"448540", "TIGER AI반도체핵심공정",         "AI 반도체 핵심 밸류체인"},
+                // ── 배당/인컴 ──────────────────────────────────────────
+                new String[]{"446720", "SOL 미국배당다우존스",           "미국 고배당 성장주 ETF"},
+                new String[]{"272560", "TIGER 배당성장",                 "꾸준히 자라는 국내 배당주"},
+                // ── 채권/파킹 ──────────────────────────────────────────
+                new String[]{"461580", "KODEX CD금리액티브(합성)",       "현금 파킹의 정석 CD금리"},
+                new String[]{"439870", "TIGER KOFR금리액티브(합성)",     "익일물 금리 초단기 파킹"},
+                // ── 레버리지/인버스 ────────────────────────────────────
+                new String[]{"122630", "KODEX 레버리지",                 "코스피200 2배 불마켓용"},
+                new String[]{"114800", "KODEX 인버스",                   "코스피200 역방향 헤지용"}
+            )
+            : List.of(
+                new String[]{"005930", "삼성전자",           null},
+                new String[]{"000660", "SK하이닉스",         null},
+                new String[]{"005935", "삼성전자우",          null},
+                new String[]{"373220", "LG에너지솔루션",      null},
+                new String[]{"005380", "현대차",              null},
+                new String[]{"207940", "삼성바이오로직스",    null},
+                new String[]{"000270", "기아",                null},
+                new String[]{"068270", "셀트리온",            null},
+                new String[]{"105560", "KB금융",              null},
+                new String[]{"055550", "신한지주",            null}
+            );
+
+        String normalizedType = isEtf ? "etf" : "stock";
+        return list.stream()
+            .limit(safeLimit)
+            .map(arr -> StockSearchDto.builder()
+                .symbol(arr[0])
+                .name(arr[1])
+                .market("KRX")
                 .type(normalizedType)
                 .description(arr.length > 2 ? arr[2] : null)
                 .build())
@@ -1313,33 +1371,38 @@ public class NaverStockServiceImpl implements NaverStockService {
         List<String> effectiveKeywords = (keywords == null || keywords.isEmpty())
             ? newsKeywordsService.getKeywords()
             : keywords;
+        List<String> normalizedKeywords = effectiveKeywords.stream()
+            .map(keyword -> keyword == null ? "" : keyword.trim())
+            .filter(keyword -> !keyword.isBlank())
+            .distinct()
+            .collect(Collectors.toList());
         log.info("미국 뉴스 조회 시작: limit={}, keywords={}", safeLimit, effectiveKeywords);
 
         List<UsNewsDto> all = new ArrayList<>();
 
         // 1. 연합뉴스 경제 RSS (안정적)
         all.addAll(fetchAndParseFiltered("https://www.yna.co.kr/rss/economy.xml",
-            "https://www.yna.co.kr/", "연합뉴스", PER_SOURCE, effectiveKeywords));
+            "https://www.yna.co.kr/", "연합뉴스", PER_SOURCE, normalizedKeywords));
 
         // 2. 매일경제 글로벌 RSS (안정적)
         all.addAll(fetchAndParseFiltered("https://www.mk.co.kr/rss/40300001/",
-            "https://www.mk.co.kr/", "매일경제", PER_SOURCE, effectiveKeywords));
+            "https://www.mk.co.kr/", "매일경제", PER_SOURCE, normalizedKeywords));
 
         // 3. KBS 경제 뉴스 RSS
         all.addAll(fetchAndParseFiltered("https://news.kbs.co.kr/rss/economic.xml",
-            "https://news.kbs.co.kr/", "KBS뉴스", PER_SOURCE, effectiveKeywords));
+            "https://news.kbs.co.kr/", "KBS뉴스", PER_SOURCE, normalizedKeywords));
 
         // 4. 서울경제 경제 RSS
         all.addAll(fetchAndParseFiltered("https://www.sedaily.com/rss/economy",
-            "https://www.sedaily.com/", "서울경제", PER_SOURCE, effectiveKeywords));
+            "https://www.sedaily.com/", "서울경제", PER_SOURCE, normalizedKeywords));
 
         // 5. 아시아경제 경제 RSS
         all.addAll(fetchAndParseFiltered("https://www.asiae.co.kr/rss/economy.htm",
-            "https://www.asiae.co.kr/", "아시아경제", PER_SOURCE, effectiveKeywords));
+            "https://www.asiae.co.kr/", "아시아경제", PER_SOURCE, normalizedKeywords));
 
         // 6. 파이낸셜뉴스 경제 RSS
         all.addAll(fetchAndParseFiltered("https://www.fnnews.com/rss/r20/fn_realnews_economy.xml",
-            "https://www.fnnews.com/", "파이낸셜뉴스", PER_SOURCE, effectiveKeywords));
+            "https://www.fnnews.com/", "파이낸셜뉴스", PER_SOURCE, normalizedKeywords));
 
         List<UsNewsDto> result = deduplicateByTitle(all).stream()
             .sorted((a, b) -> comparePubDateDesc(b.getPubDate(), a.getPubDate()))
@@ -1396,7 +1459,10 @@ public class NaverStockServiceImpl implements NaverStockService {
         Set<String> seen = new LinkedHashSet<>();
         List<UsNewsDto> result = new ArrayList<>();
         for (UsNewsDto item : news) {
-            String key = item.getTitle().replaceAll("\\s+", " ").trim().toLowerCase();
+            if (item == null || item.getTitle() == null) {
+                continue;
+            }
+            String key = item.getTitle().replaceAll("\\s+", " ").trim().toLowerCase(Locale.ROOT);
             if (seen.add(key)) {
                 result.add(item);
             }
@@ -1425,8 +1491,10 @@ public class NaverStockServiceImpl implements NaverStockService {
                 if (rawTitle.isBlank() || link.isBlank()) continue;
 
                 // 키워드 필터 (설정 키워드 또는 기본 키워드 중 하나라도 포함 시 통과)
-                boolean matchesKeyword = keywords.stream()
-                    .anyMatch(kw -> rawTitle.contains(kw.trim()));
+                String normalizedTitle = rawTitle.toLowerCase(Locale.ROOT);
+                boolean matchesKeyword = keywords.isEmpty() || keywords.stream()
+                    .map(keyword -> keyword.toLowerCase(Locale.ROOT))
+                    .anyMatch(normalizedTitle::contains);
                 if (!matchesKeyword) continue;
                 if (!isWithinHours(pubDate, 36)) continue;
 

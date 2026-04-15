@@ -11,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * 네이버 증권 API 기반 주식/ETF 데이터 퍼사드
@@ -52,7 +53,15 @@ public class StockDataFacade {
     }
 
     public List<UsNewsDto> getUsNews(int limit, List<String> keywords) {
-        return naverStockService.getUsNews(limit, keywords);
+        List<String> effectiveKeywords = (keywords == null || keywords.isEmpty())
+            ? newsKeywordsService.getKeywords()
+            : keywords;
+        List<String> normalizedKeywords = effectiveKeywords.stream()
+            .map(keyword -> keyword == null ? "" : keyword.trim())
+            .filter(keyword -> !keyword.isBlank())
+            .distinct()
+            .collect(Collectors.toList());
+        return naverStockService.getUsNews(limit, normalizedKeywords);
     }
 
     public List<String> getNewsKeywords() {
