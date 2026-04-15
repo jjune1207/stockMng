@@ -20,7 +20,7 @@
     </a>
     <div class="d-flex align-items-center gap-2">
         <div class="input-group input-group-sm" style="width: 260px;">
-            <input type="text" id="quickSearch" class="form-control bg-dark text-light border-secondary"
+            <input type="text" id="quickSearch" class="form-control border-secondary"
                    placeholder="종목 검색..." autocomplete="off">
         </div>
         <button class="btn btn-sm btn-outline-warning" id="themeToggle" onclick="toggleTheme()" title="테마 전환">
@@ -33,7 +33,7 @@
 </nav>
 
 <!-- 빠른 검색 결과 -->
-<div id="quickSearchResults" class="position-fixed bg-dark border border-secondary rounded"
+<div id="quickSearchResults" class="position-fixed border rounded"
      style="z-index: 2000; display: none; max-height: 300px; overflow-y: auto; top: 55px; right: 80px; width: 300px;">
 </div>
 
@@ -279,12 +279,10 @@
         if (typeof updateMAValues === 'function') updateMAValues();
         if (typeof analyzeTradingSignal === 'function') analyzeTradingSignal();
 
-        const qsr = document.getElementById('quickSearchResults');
-        if (qsr) {
-            qsr.classList.toggle('bg-dark', isDark);
-            qsr.classList.toggle('bg-white', !isDark);
-            qsr.classList.toggle('border-secondary', isDark);
-            qsr.classList.toggle('border-light-subtle', !isDark);
+        const qs = document.getElementById('quickSearch');
+        if (qs) {
+            qs.classList.toggle('border-secondary', isDark);
+            qs.classList.toggle('border-light-subtle', !isDark);
         }
 
         localStorage.setItem('theme', theme);

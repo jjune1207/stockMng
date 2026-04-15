@@ -121,6 +121,19 @@ body {
     color: #ffc107 !important;
 }
 
+/* 퀵서치 결과 드롭다운 */
+#quickSearchResults {
+    background-color: #212529;
+    border-color: #6c757d !important;
+    color: #f8f9fa;
+}
+
+[data-bs-theme="light"] #quickSearchResults {
+    background-color: #ffffff;
+    border-color: #dee2e6 !important;
+    color: #212529;
+}
+
 /* 검색 결과 hover */
 .search-item:hover {
     background-color: rgba(255, 255, 255, 0.08) !important;
@@ -345,6 +358,10 @@ body[data-bs-theme="light"] .watchlist-group-tag {
     color: #495057 !important;
     background-color: transparent !important;
     border-color: #6c757d !important;
+}
+
+[data-bs-theme="light"] .search-item {
+    border-color: #dee2e6 !important;
 }
 
 [data-bs-theme="light"] .search-item:hover {

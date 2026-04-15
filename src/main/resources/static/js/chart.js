@@ -14,13 +14,18 @@ let currentData = null;
 let currentTimeframe = 'day';
 let visibleDays = 66;
 
-var CHART_BG = '#131722';
-var GRID_COLOR = '#1e222d';
-var BORDER_COLOR = '#2a2e39';
-var TEXT_COLOR = '#d1d4dc';
-
 function isDarkTheme() {
     return document.body.getAttribute('data-bs-theme') !== 'light';
+}
+
+function getChartColors() {
+    var dark = isDarkTheme();
+    return {
+        bg:     dark ? '#131722' : '#ffffff',
+        grid:   dark ? '#1e222d' : '#f0f3fa',
+        border: dark ? '#2a2e39' : '#d1d4dc',
+        text:   dark ? '#d1d4dc' : '#191919',
+    };
 }
 
 function initChart(symbol) {
@@ -126,13 +131,14 @@ function setupCheckbox(id, seriesGetter) {
 
 function createMainChart() {
     var container = document.getElementById('mainChart');
+    var c = getChartColors();
     mainChart = LightweightCharts.createChart(container, {
         width: container.clientWidth, height: 480,
-        layout: { background: { color: CHART_BG }, textColor: TEXT_COLOR },
-        grid: { vertLines: { color: GRID_COLOR }, horzLines: { color: GRID_COLOR } },
+        layout: { background: { color: c.bg }, textColor: c.text },
+        grid: { vertLines: { color: c.grid }, horzLines: { color: c.grid } },
         crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
-        rightPriceScale: { borderColor: BORDER_COLOR },
-        timeScale: { borderColor: BORDER_COLOR, timeVisible: false, secondsVisible: false },
+        rightPriceScale: { borderColor: c.border },
+        timeScale: { borderColor: c.border, timeVisible: false, secondsVisible: false },
     });
 
     candleSeries = mainChart.addCandlestickSeries({
@@ -166,12 +172,13 @@ function createMainChart() {
 
 function createVolumeChart() {
     var container = document.getElementById('volumeChart');
+    var c = getChartColors();
     volumeChart = LightweightCharts.createChart(container, {
         width: container.clientWidth, height: 100,
-        layout: { background: { color: CHART_BG }, textColor: TEXT_COLOR },
-        grid: { vertLines: { color: GRID_COLOR }, horzLines: { visible: false } },
-        rightPriceScale: { borderColor: BORDER_COLOR, scaleMargins: { top: 0.1, bottom: 0 } },
-        timeScale: { borderColor: BORDER_COLOR, visible: false },
+        layout: { background: { color: c.bg }, textColor: c.text },
+        grid: { vertLines: { color: c.grid }, horzLines: { visible: false } },
+        rightPriceScale: { borderColor: c.border, scaleMargins: { top: 0.1, bottom: 0 } },
+        timeScale: { borderColor: c.border, visible: false },
     });
     volumeSeries = volumeChart.addHistogramSeries({ priceFormat: { type: 'volume' }, priceScaleId: '' });
     volumeChart.priceScale('').applyOptions({ scaleMargins: { top: 0.1, bottom: 0 } });

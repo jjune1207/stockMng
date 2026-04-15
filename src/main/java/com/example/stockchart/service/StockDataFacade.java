@@ -45,7 +45,8 @@ public class StockDataFacade {
         if ("us_stock".equalsIgnoreCase(type) || "us_etf".equalsIgnoreCase(type)) {
             return naverStockService.getUsPopular(type, limit);
         }
-        return naverStockService.getTopByVolume(type, limit);
+        // 국내 stock/etf → 고정 큐레이션 리스트 (미국과 동일 구조)
+        return naverStockService.getDomesticPopular(type, limit);
     }
 
     public List<MarketIndicatorDto> getMarketIndicators() {
