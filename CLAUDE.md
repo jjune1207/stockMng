@@ -44,7 +44,7 @@ gradlew.bat test
 
 ### 데이터 흐름
 
-- 외부 API: 네이버 증권 (시세, 차트, 검색, 랭킹), Yahoo Finance (해외종목·시장지표·금/은), 한국 경제 RSS 6종 (구글뉴스/다음/한국경제/연합뉴스/매일경제/이데일리 — 소스당 1~2건, 최대 10건 수집 후 중복제거)
+- 외부 API: 네이버 증권 (시세, 차트, 검색, 랭킹), Yahoo Finance (해외종목·시장지표·금/은), 한국 경제 RSS 8종 (구글뉴스/다음/한국경제/연합뉴스/매일경제/이데일리/JTBC/YTN — 소스당 1~2건, 최대 10건 수집 후 중복제거)
 - `StockPriceDto`: `currency`(KRW/USD), `description`(미국 ETF 한글 설명, optional). 캐시: Caffeine (현재가 30초, 캔들 10분, 분봉 1분, 검색 60분, 랭킹 10분, 시장지표 5분, 뉴스 30분, 미국인기종목 30분, 국내인기종목 60분)
 - 프론트 자동 갱신: 주식/시장지표 5분, 뉴스 30분 (별도 타이머)
 - 영속화: `data/watchlist.json`, `data/news-keywords.json` (`.gitignore`에 포함)

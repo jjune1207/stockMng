@@ -1404,6 +1404,16 @@ public class NaverStockServiceImpl implements NaverStockService {
         all.addAll(fetchAndParseFiltered("https://www.fnnews.com/rss/r20/fn_realnews_economy.xml",
             "https://www.fnnews.com/", "파이낸셜뉴스", PER_SOURCE, normalizedKeywords));
 
+        // 7. JTBC 뉴스 (구글 뉴스 RSS - 최신 기사)
+        all.addAll(fetchAndParseFiltered(
+            "https://news.google.com/rss/search?q=site%3Anews.jtbc.co.kr&hl=ko&gl=KR&ceid=KR:ko",
+            "https://news.jtbc.co.kr/", "JTBC", PER_SOURCE, normalizedKeywords));
+
+        // 8. YTN 뉴스 (구글 뉴스 RSS - 최신 기사)
+        all.addAll(fetchAndParseFiltered(
+            "https://news.google.com/rss/search?q=site%3Awww.ytn.co.kr&hl=ko&gl=KR&ceid=KR:ko",
+            "https://www.ytn.co.kr/", "YTN", PER_SOURCE, normalizedKeywords));
+
         List<UsNewsDto> result = deduplicateByTitle(all).stream()
             .sorted((a, b) -> comparePubDateDesc(b.getPubDate(), a.getPubDate()))
             .limit(safeLimit)
@@ -1418,7 +1428,7 @@ public class NaverStockServiceImpl implements NaverStockService {
                                                    List<String> keywords) {
         try {
             String xml = yahooWebClient.get()
-                .uri(url)
+                .uri(java.net.URI.create(url))
                 .header("Referer", referer)
                 .retrieve()
                 .bodyToMono(String.class)
@@ -1427,6 +1437,10 @@ public class NaverStockServiceImpl implements NaverStockService {
                 List<UsNewsDto> items = parseUsNewsXmlWithFilter(xml, limit, sourceName, keywords);
                 log.info("{} RSS 수집: {}건", sourceName, items.size());
                 return items;
+            } else {
+                String preview = xml == null ? "null" : xml.substring(0, Math.min(200, xml.length()));
+                log.warn("{} RSS 응답 없음 또는 <item> 미포함 (응답길이={}, 미리보기={})", sourceName,
+                    xml == null ? 0 : xml.length(), preview);
             }
         } catch (Exception e) {
             log.warn("{} RSS 조회 실패: {}", sourceName, e.getMessage());
