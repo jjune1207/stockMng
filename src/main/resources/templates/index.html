@@ -15,7 +15,7 @@
         <i class="bi bi-bar-chart-fill text-warning me-2"></i>주식 분석 차트
     </a>
     <div class="d-flex align-items-center gap-3 position-relative">
-        <small class="text-secondary d-none d-md-inline">네이버 증권 API 기반 | 거래량 상위 10개 + 관심 종목</small>
+        <small class="text-secondary d-none d-md-inline">네이버 증권 API 기반 | 인기 종목 + 관심 종목</small>
         <div class="d-flex align-items-center gap-1">
             <small class="text-secondary" id="nextRefresh"></small>
             <button class="btn btn-sm btn-outline-secondary stock-settings-btn"
@@ -36,8 +36,8 @@
                 <button class="btn btn-sm stock-interval-btn" data-sec="3600" onclick="applyStockInterval(3600)">1시간</button>
             </div>
         </div>
-        <button class="btn btn-sm btn-outline-secondary" onclick="refreshAll()" title="지금 새로고침">
-            <i class="bi bi-arrow-clockwise"></i>
+        <button class="btn btn-sm btn-outline-secondary" id="refreshBtn" onclick="refreshAll()" title="지금 새로고침">
+            <i class="bi bi-arrow-clockwise" id="refreshIcon"></i>
         </button>
         <button class="btn btn-sm btn-outline-warning" id="themeToggle" onclick="toggleTheme()" title="테마 전환">
             <i class="bi bi-sun-fill"></i>
@@ -115,6 +115,9 @@
             </h6>
             <div class="d-flex align-items-center gap-2">
                 <small class="text-secondary" id="newsUpdated"></small>
+                <button class="btn btn-sm btn-outline-secondary" id="newsRefreshBtn" onclick="refreshNews()" title="뉴스 새로고침">
+                    <i class="bi bi-arrow-clockwise" id="newsRefreshIcon"></i>
+                </button>
                 <button class="btn btn-sm btn-outline-secondary news-settings-btn"
                         id="newsSettingsBtn" title="뉴스 설정"
                         onclick="toggleNewsSettings()">
@@ -839,6 +842,23 @@
     }
 
     // ────────────────────────────────────────────────────────────────────────
+
+    async function refreshNews() {
+        const btn = document.getElementById('newsRefreshBtn');
+        const icon = document.getElementById('newsRefreshIcon');
+        if (btn.disabled) return;
+        btn.disabled = true;
+        icon.className = 'bi bi-arrow-clockwise spin-icon';
+        try {
+            await loadUsNews();
+            icon.className = 'bi bi-check-lg';
+            setTimeout(() => { icon.className = 'bi bi-arrow-clockwise'; }, 1200);
+        } catch (e) {
+            icon.className = 'bi bi-arrow-clockwise';
+        } finally {
+            btn.disabled = false;
+        }
+    }
 
     async function loadUsNews() {
         const container = document.getElementById('usNewsList');
@@ -1781,7 +1801,20 @@
     }
 
     async function refreshAll() {
-        await Promise.all([refreshStock(), loadUsNews()]);
+        const btn = document.getElementById('refreshBtn');
+        const icon = document.getElementById('refreshIcon');
+        if (btn.disabled) return;
+        btn.disabled = true;
+        icon.className = 'bi bi-arrow-clockwise spin-icon';
+        try {
+            await Promise.all([refreshStock(), loadUsNews()]);
+            icon.className = 'bi bi-check-lg';
+            setTimeout(() => { icon.className = 'bi bi-arrow-clockwise'; }, 1200);
+        } catch (e) {
+            icon.className = 'bi bi-arrow-clockwise';
+        } finally {
+            btn.disabled = false;
+        }
     }
 
     async function initialize() {
