@@ -312,6 +312,16 @@ body {
     50%       { opacity: 0.4; }
 }
 
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+}
+
+.spin-icon {
+    display: inline-block;
+    animation: spin 0.7s linear infinite;
+}
+
 /* ──────────────────────────────────────────
    다크 모드 가독성 개선
 ────────────────────────────────────────── */
@@ -577,12 +587,6 @@ body[data-bs-theme="light"] .watchlist-group-tag {
 }
 
 /* 뉴스 설정 패널 */
-.news-settings-btn {
-    padding: 1px 7px;
-    line-height: 1.5;
-    font-size: 0.75rem;
-    border-radius: 6px;
-}
 
 .news-settings-panel {
     display: none;

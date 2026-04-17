@@ -204,6 +204,7 @@ PUT /api/stock/news-keywords
 | `marketIndicators` | 5분 | 10 | 시장 지표 (코스피/코스닥/환율/WTI/금/은/해외지수) |
 | `usPopular` | 30분 | 20 | 미국 인기 종목/ETF 목록 (고정 리스트) |
 | `usNews` | 30분 | 10 | 주요 뉴스 (8개 RSS 소스, 키워드 필터 + 중복 제거) |
+| `domesticPopular` | 60분 | 10 | 국내 인기 종목/ETF 고정 리스트 |
 
 `application.yml`에서 변경 가능:
 ```yaml
@@ -268,6 +269,7 @@ stockMng/
 │   └── application.yml
 ├── src/test/java/com/example/stockchart/
 │   ├── service/impl/InMemoryWatchlistServiceTest.java
+│   ├── service/impl/InMemoryNewsKeywordsServiceTest.java
 │   └── util/IndicatorUtilTest.java
 ├── data/
 │   ├── watchlist.json                        # 관심 종목 저장 파일 (자동 생성)
@@ -286,7 +288,7 @@ stockMng/
 | 네이버 증권 API | 국내 주식·ETF 시세, 검색, 거래량 랭킹, 분봉/일봉 차트 |
 | Yahoo Finance (`query1.finance.yahoo.com`) | 해외 종목(미국 주식 등) 시세·차트, 환율(USD/KRW), WTI, 금, 은, 해외 대표 지수. 통화 자동 감지(KRW/USD) |
 | Google News RSS (구글뉴스 / JTBC / YTN) | 뉴스 키워드 필터링 한국어 뉴스 |
-| 다음뉴스 / 한국경제 / 연합뉴스 / 매일경제 / 이데일리 / 파이낸셜뉴스 RSS | 한국 경제 뉴스 (키워드 필터링) |
+| 다음뉴스 / 한국경제 / 연합뉴스 / 매일경제 / 이데일리 RSS | 한국 경제 뉴스 (키워드 필터링) |
 
 ---
 
