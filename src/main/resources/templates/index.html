@@ -1178,7 +1178,7 @@
             ? '<br><small class="text-secondary fw-normal" style="font-size:0.72rem">' + escHtml(item.description) + '</small>'
             : '';
 
-        return '<tr>' +
+        return '<tr data-symbol="' + escHtml(price.symbol) + '" style="cursor:pointer">' +
             '<td class="fw-semibold">' + escHtml(price.name || item.name) + descHtml + '</td>' +
             '<td class="text-secondary font-monospace">' + escHtml(price.symbol) + '</td>' +
             '<td class="text-end fw-bold">' + priceCell + '</td>' +
@@ -1220,7 +1220,7 @@
             ? '<br><small class="text-secondary fw-normal" style="font-size:0.72rem">' + escHtml(item.description) + '</small>'
             : '';
 
-        return '<tr>' +
+        return '<tr data-symbol="' + escHtml(price.symbol) + '" style="cursor:pointer">' +
             '<td class="fw-semibold">' + escHtml(price.name || item.name) + descHtml + '</td>' +
             '<td class="text-secondary font-monospace">' + escHtml(price.symbol) + '</td>' +
             '<td class="text-end fw-bold">' + fmtPriceCell(price.currentPrice, cur) + '</td>' +
@@ -1238,7 +1238,7 @@
         const descHtml = item.description
             ? '<br><small class="text-secondary fw-normal" style="font-size:0.72rem">' + escHtml(item.description) + '</small>'
             : '';
-        return '<tr>' +
+        return '<tr data-symbol="' + escHtml(item.symbol) + '" style="cursor:pointer">' +
             '<td class="fw-semibold">' + escHtml(item.name) + descHtml + '</td>' +
             '<td class="text-secondary font-monospace">' + escHtml(item.symbol) + '</td>' +
             '<td colspan="4" class="text-secondary text-center small">조회 실패</td>' +
@@ -1301,7 +1301,7 @@
             ? escHtml(price.name || item.name) + '<br><small class="text-secondary" style="font-size:0.72rem">' + escHtml(price.description) + '</small>'
             : escHtml(price.name || item.name);
 
-        return '<tr>' +
+        return '<tr data-symbol="' + escHtml(item.symbol) + '" style="cursor:pointer">' +
             '<td class="fw-semibold">' + watchlistNameCell + '</td>' +
             '<td class="text-secondary font-monospace small">' + escHtml(item.symbol) + '</td>' +
             '<td>' + buildTypeBadge(item, price) + '</td>' +
@@ -1325,7 +1325,7 @@
             ? '<button class="btn btn-sm btn-outline-danger" data-action="remove-watch" data-symbol="' + escHtml(item.symbol) + '">삭제</button>'
             : '<button class="btn btn-sm btn-outline-danger" data-action="remove-watch" data-symbol="' + escHtml(item.symbol + '|' + item.group) + '">삭제</button>';
 
-        return '<tr>' +
+        return '<tr data-symbol="' + escHtml(item.symbol) + '" style="cursor:pointer">' +
             '<td class="fw-semibold">' + escHtml(item.name || item.symbol) + '</td>' +
             '<td class="text-secondary font-monospace small">' + escHtml(item.symbol) + '</td>' +
             '<td>' + buildTypeBadge(item, null) + '</td>' +
@@ -1443,6 +1443,14 @@
     function bindEvents() {
         bindHorizontalScroll(document.getElementById('marketIndicatorList'));
         bindHorizontalScroll(document.getElementById('usNewsList'));
+
+        // 행 더블클릭 → 차트 상세 이동 (버튼/링크/select 클릭 시 제외)
+        document.addEventListener('dblclick', function(e) {
+            if (e.target.closest('a, button, select')) return;
+            const tr = e.target.closest('tr[data-symbol]');
+            if (!tr) return;
+            window.location.href = '/chart/' + encodeURIComponent(tr.dataset.symbol);
+        });
 
         // 관심종목 USD/KRW 토글
         document.addEventListener('click', function(e) {
