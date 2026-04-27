@@ -411,16 +411,18 @@
                                 <th class="sortable-th" data-sort="name" style="cursor:pointer">이름 <i class="bi bi-arrow-down-up small"></i></th>
                                 <th>코드</th>
                                 <th>구분</th>
-                                <th>그룹</th>
+                                <th class="text-end sortable-th" data-sort="weight" style="cursor:pointer">비중 <i class="bi bi-arrow-down-up small"></i></th>
+                                <th class="text-end sortable-th" data-sort="returnRate" style="cursor:pointer">수익율 <i class="bi bi-arrow-down-up small"></i></th>
                                 <th class="text-end sortable-th" data-sort="price" style="cursor:pointer">현재가 <i class="bi bi-arrow-down-up small"></i></th>
                                 <th class="text-end sortable-th" data-sort="changeRate" style="cursor:pointer">등락률 <i class="bi bi-arrow-down-up small"></i></th>
                                 <th class="text-end sortable-th" data-sort="volume" style="cursor:pointer">거래량 <i class="bi bi-arrow-down-up small"></i></th>
+                                <th>그룹</th>
                                 <th class="text-center">동작</th>
                             </tr>
                             </thead>
                             <tbody id="watchlistTableBody">
                             <tr>
-                                <td colspan="8" class="text-center py-4 text-secondary">
+                                <td colspan="10" class="text-center py-4 text-secondary">
                                     관심 종목이 없습니다. 검색 결과에서 추가해 주세요.
                                 </td>
                             </tr>
@@ -428,6 +430,78 @@
                         </table>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 포트폴리오 편집 모달 -->
+<div class="modal fade" id="portfolioModal" tabindex="-1" aria-labelledby="portfolioModalTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content portfolio-modal-content">
+            <div class="modal-header portfolio-modal-header py-2">
+                <h6 class="modal-title fw-semibold" id="portfolioModalTitle">
+                    <i class="bi bi-wallet2 me-2 text-info"></i>보유 정보 입력
+                </h6>
+                <button type="button" class="btn-close portfolio-modal-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="d-flex justify-content-between align-items-center mb-3 p-2 portfolio-info-box rounded">
+                    <div>
+                        <div class="small text-secondary">현재가</div>
+                        <div class="fw-bold fs-5" id="portfolioCurrentPrice">-</div>
+                    </div>
+                    <div class="text-end">
+                        <div class="small text-secondary">종목</div>
+                        <div class="small" id="portfolioSymbolLabel"></div>
+                    </div>
+                </div>
+
+                <div class="row g-2 mb-2">
+                    <div class="col-6">
+                        <label class="form-label small text-secondary mb-1">보유수량 (주)</label>
+                        <input type="number" class="form-control form-control-sm portfolio-input"
+                               id="portfolioQuantity" min="0" step="1" placeholder="0">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small text-secondary mb-1">평균단가</label>
+                        <input type="number" class="form-control form-control-sm portfolio-input"
+                               id="portfolioAvgPrice" min="0" step="any" placeholder="0">
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center p-2 portfolio-info-box rounded">
+                        <span class="small text-secondary">매입금액</span>
+                        <span class="fw-semibold" id="portfolioPurchaseAmount">-</span>
+                    </div>
+                </div>
+
+                <div class="row g-2 text-center">
+                    <div class="col-4">
+                        <div class="p-2 portfolio-stat-box rounded h-100">
+                            <div class="small text-secondary mb-1">평가금액</div>
+                            <div class="fw-bold small" id="portfolioEvaluation">-</div>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="p-2 portfolio-stat-box rounded h-100">
+                            <div class="small text-secondary mb-1">평가손익</div>
+                            <div class="fw-bold small" id="portfolioProfitLoss">-</div>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="p-2 portfolio-stat-box rounded h-100">
+                            <div class="small text-secondary mb-1">수익율</div>
+                            <div class="fw-bold small" id="portfolioReturnRate">-</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer portfolio-modal-header py-2">
+                <button type="button" class="btn btn-sm btn-outline-danger me-auto" id="portfolioResetBtn">초기화</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">닫기</button>
+                <button type="button" class="btn btn-sm btn-info" id="portfolioSaveBtn">저장</button>
             </div>
         </div>
     </div>
@@ -665,7 +739,7 @@
     let searchDebounceTimer = null;
     let watchlistPriceCache = []; // {item, price} 배열
     let currentGroupFilter = '__all__';
-    let currentSort = { key: 'name', asc: true };
+    let currentSort = { key: 'weight', asc: false };
     let groupList = [];
     let groupSelectorTarget = null; // 관심추가 시 그룹 선택 대상
     let dragSrcGroup = null;
@@ -680,6 +754,8 @@
 
     (function() { applyTheme(getStoredTheme()); })();
 
+    const PREFERRED_GROUP_ORDER = ['ISA', '국내주식', '연금저축', '미국주식'];
+
     function loadGroupOrder() {
         try {
             const saved = localStorage.getItem('watchlistGroupOrder');
@@ -692,13 +768,17 @@
     }
 
     function applyGroupOrder(serverGroups) {
+        // 1) 선호 순서에 있는 그룹 먼저 (서버에 실제 존재하는 것만)
+        const preferred = PREFERRED_GROUP_ORDER.filter(g => serverGroups.includes(g));
+        // 2) 선호 순서에 없는 나머지 그룹: localStorage 드래그 순서 → 없으면 알파벳
+        const rest = serverGroups.filter(g => !PREFERRED_GROUP_ORDER.includes(g));
         const savedOrder = loadGroupOrder();
-        if (!savedOrder) return serverGroups;
-        // localStorage에 저장된 그룹 순서를 유지하면서, 서버에만 있는 새 그룹도 추가
-        const ordered = [];
-        savedOrder.forEach(g => ordered.push(g));
-        serverGroups.forEach(g => { if (!ordered.includes(g)) ordered.push(g); });
-        return ordered;
+        if (savedOrder) {
+            const savedRest = savedOrder.filter(g => rest.includes(g));
+            const newRest = rest.filter(g => !savedOrder.includes(g));
+            return [...preferred, ...savedRest, ...newRest];
+        }
+        return [...preferred, ...rest];
     }
 
     async function fetchPrice(symbol) {
@@ -959,7 +1039,7 @@
             if (!items || items.length === 0) {
                 watchlistPriceCache = [];
                 tbody.innerHTML =
-                    '<tr><td colspan="8" class="text-center py-4 text-secondary">관심 종목이 없습니다. 검색 결과에서 추가해 주세요.</td></tr>';
+                    '<tr><td colspan="10" class="text-center py-4 text-secondary">관심 종목이 없습니다. 검색 결과에서 추가해 주세요.</td></tr>';
                 document.getElementById('watchlistUpdated').textContent = '';
                 return;
             }
@@ -978,7 +1058,7 @@
                 '업데이트: ' + new Date().toLocaleTimeString('ko-KR');
         } catch (e) {
             tbody.innerHTML =
-                '<tr><td colspan="8" class="text-center py-4 text-danger">관심 목록을 불러오지 못했습니다.</td></tr>';
+                '<tr><td colspan="10" class="text-center py-4 text-danger">관심 목록을 불러오지 못했습니다.</td></tr>';
         }
     }
 
@@ -1094,8 +1174,31 @@
             filtered = filtered.filter(r => r.item.group === currentGroupFilter);
         }
 
+        if (filtered.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="10" class="text-center py-4 text-secondary">' +
+                (currentGroupFilter === '__all__' ? '관심 종목이 없습니다. 검색 결과에서 추가해 주세요.' : '이 그룹에 종목이 없습니다.') + '</td></tr>';
+            return;
+        }
+
+        const totalEvalKrw = filtered.reduce((sum, r) => {
+            if (!r.price || !r.item.quantity || !r.item.purchasePrice || r.item.quantity <= 0 || r.item.purchasePrice <= 0) return sum;
+            const isUSD = r.price.currency === 'USD';
+            const cur = isUSD ? (r.price.currentPrice / 100) * (usdKrwRate > 0 ? usdKrwRate : 1) : r.price.currentPrice;
+            return sum + cur * r.item.quantity;
+        }, 0);
+
         // 정렬
         filtered = [...filtered].sort((a, b) => {
+            // 전체 탭: 그룹 순서(PREFERRED_GROUP_ORDER) 우선
+            if (currentGroupFilter === '__all__') {
+                const gi = g => {
+                    const idx = PREFERRED_GROUP_ORDER.indexOf(g);
+                    return idx === -1 ? PREFERRED_GROUP_ORDER.length : idx;
+                };
+                const gDiff = gi(a.item.group) - gi(b.item.group);
+                if (gDiff !== 0) return gDiff;
+            }
+
             let va, vb;
             switch (currentSort.key) {
                 case 'name':
@@ -1114,19 +1217,32 @@
                     va = a.price?.volume || 0;
                     vb = b.price?.volume || 0;
                     break;
-                default:
-                    return 0;
+                case 'returnRate': {
+                    // 수익률 내림차순, 포트폴리오 없는 항목은 뒤로
+                    const ra = calcReturnRate(a.item, a.price);
+                    const rb = calcReturnRate(b.item, b.price);
+                    if (ra === null && rb === null) return 0;
+                    if (ra === null) return 1;
+                    if (rb === null) return -1;
+                    va = ra; vb = rb;
+                    break;
+                }
+                case 'weight':
+                default: {
+                    // 비중 내림차순, 포트폴리오 없는 항목은 뒤로
+                    const wa = calcPortfolioWeight(a.item, a.price, totalEvalKrw);
+                    const wb = calcPortfolioWeight(b.item, b.price, totalEvalKrw);
+                    if (wa === null && wb === null) return 0;
+                    if (wa === null) return 1;
+                    if (wb === null) return -1;
+                    va = wa; vb = wb;
+                    break;
+                }
             }
             return currentSort.asc ? va - vb : vb - va;
         });
 
-        if (filtered.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-secondary">' +
-                (currentGroupFilter === '__all__' ? '관심 종목이 없습니다. 검색 결과에서 추가해 주세요.' : '이 그룹에 종목이 없습니다.') + '</td></tr>';
-            return;
-        }
-
-        const rows = filtered.map(r => r.price ? buildWatchlistRow(r.price, r.item) : buildWatchlistErrorRow(r.item));
+        const rows = filtered.map(r => r.price ? buildWatchlistRow(r.price, r.item, totalEvalKrw) : buildWatchlistErrorRow(r.item));
         tbody.innerHTML = rows.join('');
     }
 
@@ -1277,7 +1393,35 @@
         return '<span class="badge bg-secondary">주식</span>';
     }
 
-    function buildWatchlistRow(price, item) {
+    function calcReturnRate(item, price) {
+        if (!item.quantity || !item.purchasePrice || item.quantity <= 0 || item.purchasePrice <= 0) return null;
+        const isUSD = price && price.currency === 'USD';
+        const currentPriceDisplay = price ? (isUSD ? price.currentPrice / 100 : price.currentPrice) : 0;
+        if (currentPriceDisplay <= 0) return null;
+        const purchaseAmount = item.purchasePrice * item.quantity;
+        const evaluation = currentPriceDisplay * item.quantity;
+        return purchaseAmount > 0 ? ((evaluation - purchaseAmount) / purchaseAmount) * 100 : null;
+    }
+
+    function buildPortfolioReturnCell(item, price) {
+        const rate = calcReturnRate(item, price);
+        if (rate === null) return '<td class="text-end text-secondary small">-</td>';
+        const colorClass = rate > 0 ? 'price-up' : (rate < 0 ? 'price-down' : 'price-flat');
+        const sign = rate > 0 ? '+' : '';
+        return '<td class="text-end fw-semibold ' + colorClass + '">' + sign + rate.toFixed(2) + '%</td>';
+    }
+
+    function calcPortfolioWeight(item, price, totalEvalKrw) {
+        if (!price || !item.quantity || !item.purchasePrice || item.quantity <= 0 || item.purchasePrice <= 0 || totalEvalKrw <= 0) {
+            return null;
+        }
+        const isUSD = price.currency === 'USD';
+        const curPriceKrw = isUSD ? (price.currentPrice / 100) * (usdKrwRate > 0 ? usdKrwRate : 1) : price.currentPrice;
+        const evalKrw = curPriceKrw * item.quantity;
+        return (evalKrw / totalEvalKrw) * 100;
+    }
+
+    function buildWatchlistRow(price, item, totalEvalKrw) {
         const isUp = price.priceChange > 0;
         const isDown = price.priceChange < 0;
         const colorClass = isUp ? 'price-up' : (isDown ? 'price-down' : 'price-flat');
@@ -1296,24 +1440,68 @@
         const deleteBtn = isAllView
             ? '<button class="btn btn-sm btn-outline-danger" data-action="remove-watch" data-symbol="' + escHtml(item.symbol) + '">삭제</button>'
             : '<button class="btn btn-sm btn-outline-danger" data-action="remove-watch" data-symbol="' + escHtml(item.symbol + '|' + item.group) + '">삭제</button>';
+        const portfolioBtn = '<button class="btn btn-sm btn-outline-info ms-1" data-action="portfolio" ' +
+            'data-symbol="' + escHtml(item.symbol) + '" data-group="' + escHtml(item.group) + '" title="보유 정보 입력">' +
+            '<i class="bi bi-wallet2"></i></button>';
 
+        const hasPortfolio = item.quantity > 0 && item.purchasePrice > 0;
+        const portfolioSummary = hasPortfolio ? buildPortfolioSummaryLine(item, price) : '';
+        const weight = calcPortfolioWeight(item, price, totalEvalKrw);
+        const displayName = escHtml(price.name || item.name);
         const watchlistNameCell = price.description
-            ? escHtml(price.name || item.name) + '<br><small class="text-secondary" style="font-size:0.72rem">' + escHtml(price.description) + '</small>'
-            : escHtml(price.name || item.name);
+            ? displayName + '<br><small class="text-secondary" style="font-size:0.72rem">' + escHtml(price.description) + '</small>' + portfolioSummary
+            : displayName + portfolioSummary;
+
+        const weightCell = weight !== null
+            ? '<td class="text-end fw-semibold">' + weight.toFixed(1) + '%</td>'
+            : '<td class="text-end text-secondary small">-</td>';
 
         return '<tr data-symbol="' + escHtml(item.symbol) + '" style="cursor:pointer">' +
             '<td class="fw-semibold">' + watchlistNameCell + '</td>' +
             '<td class="text-secondary font-monospace small">' + escHtml(item.symbol) + '</td>' +
             '<td>' + buildTypeBadge(item, price) + '</td>' +
-            groupCell +
+            weightCell +
+            buildPortfolioReturnCell(item, price) +
             '<td class="text-end fw-bold">' + priceCell + '</td>' +
             '<td class="text-end ' + colorClass + '">' + icon + ' ' + sign + Math.abs(Number(price.changeRate || 0)).toFixed(2) + '%</td>' +
             '<td class="text-end text-secondary">' + formatNumber(price.volume) + '</td>' +
+            groupCell +
             '<td class="text-center">' +
             '<a href="/chart/' + escHtml(item.symbol) + '" class="btn btn-sm btn-outline-warning me-1">차트</a>' +
-            deleteBtn +
+            deleteBtn + portfolioBtn +
             '</td>' +
             '</tr>';
+    }
+
+    function buildPortfolioSummaryLine(item, price) {
+        const rate = calcReturnRate(item, price);
+        if (rate === null) return '';
+
+        const isUSD = price && price.currency === 'USD';
+        const currentDisplay = price ? (isUSD ? price.currentPrice / 100 : price.currentPrice) : 0;
+        const purchaseAmount = item.purchasePrice * item.quantity;
+        const evaluation = currentDisplay * item.quantity;
+        const profitLoss = evaluation - purchaseAmount;
+
+        const colorClass = rate > 0 ? 'price-up' : (rate < 0 ? 'price-down' : 'price-flat');
+        const rateSign = rate > 0 ? '+' : '';
+        const plSign = profitLoss >= 0 ? '+' : '-';
+
+        let plFormatted;
+        if (isUSD && watchlistDisplayCurrency === 'KRW' && usdKrwRate > 0) {
+            const plAbsKrw = Math.abs(profitLoss) * usdKrwRate;
+            plFormatted = '₩' + formatNumber(Math.round(plAbsKrw));
+        } else if (isUSD) {
+            plFormatted = '$' + Math.abs(profitLoss).toFixed(2);
+        } else {
+            plFormatted = '₩' + formatNumber(Math.round(Math.abs(profitLoss)));
+        }
+
+        return '<br><small class="' + colorClass + '" style="font-size:0.7rem">' +
+            '보유 ' + formatNumber(item.quantity) + '주&nbsp;·&nbsp;' +
+            rateSign + rate.toFixed(2) + '%&nbsp;·&nbsp;' +
+            plSign + plFormatted +
+            '</small>';
     }
 
     function buildWatchlistErrorRow(item) {
@@ -1324,16 +1512,19 @@
         const deleteBtn = isAllView
             ? '<button class="btn btn-sm btn-outline-danger" data-action="remove-watch" data-symbol="' + escHtml(item.symbol) + '">삭제</button>'
             : '<button class="btn btn-sm btn-outline-danger" data-action="remove-watch" data-symbol="' + escHtml(item.symbol + '|' + item.group) + '">삭제</button>';
+        const portfolioBtn = '<button class="btn btn-sm btn-outline-info ms-1" data-action="portfolio" ' +
+            'data-symbol="' + escHtml(item.symbol) + '" data-group="' + escHtml(item.group) + '" title="보유 정보 입력">' +
+            '<i class="bi bi-wallet2"></i></button>';
 
         return '<tr data-symbol="' + escHtml(item.symbol) + '" style="cursor:pointer">' +
             '<td class="fw-semibold">' + escHtml(item.name || item.symbol) + '</td>' +
             '<td class="text-secondary font-monospace small">' + escHtml(item.symbol) + '</td>' +
             '<td>' + buildTypeBadge(item, null) + '</td>' +
+            '<td colspan="5" class="text-secondary text-center small">조회 실패</td>' +
             groupCell +
-            '<td colspan="3" class="text-secondary text-center small">조회 실패</td>' +
             '<td class="text-center">' +
             '<a href="/chart/' + escHtml(item.symbol) + '" class="btn btn-sm btn-outline-warning me-1">차트</a>' +
-            deleteBtn +
+            deleteBtn + portfolioBtn +
             '</td>' +
             '</tr>';
     }
@@ -1369,6 +1560,150 @@
             throw new Error(error.error || '관심 종목 삭제 실패');
         }
         return res.json();
+    }
+
+    /* ── 포트폴리오 모달 ── */
+    let _portfolioModal = null;
+    let _portfolioCurrentItem = null;
+    let _portfolioCurrentPrice = null;
+
+    function getPortfolioModal() {
+        if (!_portfolioModal) {
+            _portfolioModal = new bootstrap.Modal(document.getElementById('portfolioModal'));
+        }
+        return _portfolioModal;
+    }
+
+    function openPortfolioModal(item, price) {
+        _portfolioCurrentItem = item;
+        _portfolioCurrentPrice = price;
+
+        const isUSD = price && price.currency === 'USD';
+        const currentDisplay = price
+            ? (isUSD ? price.currentPrice / 100 : price.currentPrice)
+            : null;
+
+        document.getElementById('portfolioSymbolLabel').textContent =
+            (price && price.name ? price.name : item.name || item.symbol) + ' (' + item.symbol + ')';
+
+        if (currentDisplay != null) {
+            const currencySymbol = isUSD ? '$' : '₩';
+            document.getElementById('portfolioCurrentPrice').textContent =
+                currencySymbol + formatNumber(isUSD ? currentDisplay.toFixed(2) : currentDisplay);
+        } else {
+            document.getElementById('portfolioCurrentPrice').textContent = '-';
+        }
+
+        document.getElementById('portfolioQuantity').value = item.quantity > 0 ? item.quantity : '';
+        document.getElementById('portfolioAvgPrice').value = item.purchasePrice > 0 ? item.purchasePrice : '';
+
+        updatePortfolioCalc();
+        getPortfolioModal().show();
+    }
+
+    function updatePortfolioCalc() {
+        const item = _portfolioCurrentItem;
+        const price = _portfolioCurrentPrice;
+        const isUSD = price && price.currency === 'USD';
+        const currentDisplay = price
+            ? (isUSD ? price.currentPrice / 100 : price.currentPrice)
+            : 0;
+
+        const qty = parseFloat(document.getElementById('portfolioQuantity').value) || 0;
+        const avgPrice = parseFloat(document.getElementById('portfolioAvgPrice').value) || 0;
+        const currencySymbol = isUSD ? '$' : '₩';
+
+        const purchaseAmount = qty * avgPrice;
+        const evaluation = qty * currentDisplay;
+        const profitLoss = evaluation - purchaseAmount;
+        const returnRate = purchaseAmount > 0 ? (profitLoss / purchaseAmount) * 100 : null;
+
+        const fmtAmt = (v) => currencySymbol + (isUSD ? v.toFixed(2) : formatNumber(Math.round(v)));
+
+        document.getElementById('portfolioPurchaseAmount').textContent =
+            qty > 0 && avgPrice > 0 ? fmtAmt(purchaseAmount) : '-';
+
+        if (qty > 0 && avgPrice > 0 && currentDisplay > 0) {
+            document.getElementById('portfolioEvaluation').textContent = fmtAmt(evaluation);
+
+            const plEl = document.getElementById('portfolioProfitLoss');
+            plEl.textContent = (profitLoss >= 0 ? '+' : '') + fmtAmt(profitLoss);
+            plEl.className = 'fw-bold small ' + (profitLoss > 0 ? 'price-up' : profitLoss < 0 ? 'price-down' : 'price-flat');
+
+            const rrEl = document.getElementById('portfolioReturnRate');
+            if (returnRate !== null) {
+                rrEl.textContent = (returnRate >= 0 ? '+' : '') + returnRate.toFixed(2) + '%';
+                rrEl.className = 'fw-bold small ' + (returnRate > 0 ? 'price-up' : returnRate < 0 ? 'price-down' : 'price-flat');
+            } else {
+                rrEl.textContent = '-';
+                rrEl.className = 'fw-bold small';
+            }
+        } else {
+            document.getElementById('portfolioEvaluation').textContent = '-';
+            document.getElementById('portfolioProfitLoss').textContent = '-';
+            document.getElementById('portfolioProfitLoss').className = 'fw-bold small';
+            document.getElementById('portfolioReturnRate').textContent = '-';
+            document.getElementById('portfolioReturnRate').className = 'fw-bold small';
+        }
+    }
+
+    async function savePortfolio() {
+        const item = _portfolioCurrentItem;
+        if (!item) return;
+
+        const qty = parseFloat(document.getElementById('portfolioQuantity').value) || null;
+        const avgPrice = parseFloat(document.getElementById('portfolioAvgPrice').value) || null;
+
+        const compositeKey = item.symbol + (item.group ? '|' + item.group : '');
+        const res = await fetch('/api/stock/watchlist/' + encodeURIComponent(compositeKey) + '/portfolio', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ quantity: qty, purchasePrice: avgPrice }),
+        });
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({ error: '저장 실패' }));
+            throw new Error(error.error || '저장 실패');
+        }
+        const items = await res.json();
+
+        // 캐시 내 item 갱신
+        watchlistPriceCache.forEach(r => {
+            const updated = items.find(i => i.symbol === r.item.symbol && i.group === r.item.group);
+            if (updated) r.item = updated;
+        });
+        watchlistMap.clear();
+        items.forEach(i => watchlistMap.set(i.symbol, i));
+
+        renderWatchlistTable();
+        getPortfolioModal().hide();
+    }
+
+    async function resetPortfolio() {
+        const item = _portfolioCurrentItem;
+        if (!item) return;
+
+        document.getElementById('portfolioQuantity').value = '';
+        document.getElementById('portfolioAvgPrice').value = '';
+        updatePortfolioCalc();
+
+        const compositeKey = item.symbol + (item.group ? '|' + item.group : '');
+        const res = await fetch('/api/stock/watchlist/' + encodeURIComponent(compositeKey) + '/portfolio', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ quantity: null, purchasePrice: null }),
+        });
+        if (!res.ok) return;
+        const items = await res.json();
+
+        watchlistPriceCache.forEach(r => {
+            const updated = items.find(i => i.symbol === r.item.symbol && i.group === r.item.group);
+            if (updated) r.item = updated;
+        });
+        watchlistMap.clear();
+        items.forEach(i => watchlistMap.set(i.symbol, i));
+
+        renderWatchlistTable();
+        getPortfolioModal().hide();
     }
 
     async function doSearch() {
@@ -1554,7 +1889,24 @@
                     .catch(err => {
                         alert(err.message);
                     });
+            } else if (action === 'portfolio') {
+                const symbol = actionEl.dataset.symbol;
+                const group = actionEl.dataset.group;
+                const cached = watchlistPriceCache.find(r => r.item.symbol === symbol && r.item.group === group)
+                    || watchlistPriceCache.find(r => r.item.symbol === symbol);
+                if (cached) {
+                    openPortfolioModal(cached.item, cached.price);
+                }
             }
+        });
+
+        document.getElementById('portfolioQuantity').addEventListener('input', updatePortfolioCalc);
+        document.getElementById('portfolioAvgPrice').addEventListener('input', updatePortfolioCalc);
+        document.getElementById('portfolioSaveBtn').addEventListener('click', function() {
+            savePortfolio().catch(err => alert(err.message));
+        });
+        document.getElementById('portfolioResetBtn').addEventListener('click', function() {
+            resetPortfolio().catch(err => alert(err.message));
         });
     }
 
@@ -1590,7 +1942,8 @@
         if (currentSort.key === key) {
             currentSort.asc = !currentSort.asc;
         } else {
-            currentSort = { key, asc: key === 'name' };
+            // 이름·거래량은 오름차순 기본, 나머지(수익율·가격·등락률)는 내림차순 기본
+            currentSort = { key, asc: key === 'name' || key === 'volume' ? true : false };
         }
         renderWatchlistTable();
     });

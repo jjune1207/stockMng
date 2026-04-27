@@ -203,4 +203,12 @@ public class StockApiController {
         @RequestBody Map<String, String> body) {
         return ResponseEntity.ok(stockDataFacade.renameWatchlistGroup(groupName, body.get("newName")));
     }
+
+    @PutMapping("/watchlist/{symbol}/portfolio")
+    public ResponseEntity<List<WatchlistItemDto>> updatePortfolio(
+        @PathVariable("symbol") String symbol,
+        @RequestBody Map<String, Double> body) {
+        return ResponseEntity.ok(stockDataFacade.updateWatchlistPortfolio(
+            symbol, body.get("quantity"), body.get("purchasePrice")));
+    }
 }

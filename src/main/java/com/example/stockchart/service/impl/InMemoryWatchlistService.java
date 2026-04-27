@@ -272,6 +272,22 @@ public class InMemoryWatchlistService implements WatchlistService {
     }
 
     @Override
+    public List<WatchlistItemDto> updatePortfolio(String symbolOrKey, Double quantity, Double purchasePrice) {
+        synchronized (watchlistLock) {
+            String trimmed = normalizeSymbol(symbolOrKey);
+            String key = watchlist.containsKey(trimmed) ? trimmed : resolveKeyForSymbol(trimmed);
+            if (key == null) {
+                throw new IllegalArgumentException("관심 목록에 없는 항목입니다: " + trimmed);
+            }
+            WatchlistItemDto item = watchlist.get(key);
+            item.setQuantity(quantity);
+            item.setPurchasePrice(purchasePrice);
+            persistSnapshotLocked();
+            return getWatchlistLocked();
+        }
+    }
+
+    @Override
     public List<WatchlistItemDto> renameGroup(String oldName, String newName) {
         synchronized (watchlistLock) {
             if (oldName == null || oldName.isBlank() || newName == null || newName.isBlank()) {

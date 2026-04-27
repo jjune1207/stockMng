@@ -19,4 +19,6 @@ public interface WatchlistService {
     List<WatchlistItemDto> deleteGroup(String groupName);
 
     List<WatchlistItemDto> renameGroup(String oldName, String newName);
+
+    List<WatchlistItemDto> updatePortfolio(String symbolOrKey, Double quantity, Double purchasePrice);
 }

@@ -100,4 +100,8 @@ public class StockDataFacade {
     public List<WatchlistItemDto> renameWatchlistGroup(String oldName, String newName) {
         return watchlistService.renameGroup(oldName, newName);
     }
+
+    public List<WatchlistItemDto> updateWatchlistPortfolio(String symbolOrKey, Double quantity, Double purchasePrice) {
+        return watchlistService.updatePortfolio(symbolOrKey, quantity, purchasePrice);
+    }
 }

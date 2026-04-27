@@ -45,7 +45,7 @@ gradlew.bat test
 ### 데이터 흐름
 
 - 외부 API: 네이버 증권 (시세, 차트, 검색, 랭킹), Yahoo Finance (해외종목·시장지표·금/은), 한국 경제 RSS 8종 (구글뉴스/다음/한국경제/연합뉴스/매일경제/이데일리/JTBC/YTN — 소스당 1~2건, 최대 10건 수집 후 중복제거)
-- `StockPriceDto`: `currency`(KRW/USD), `description`(미국 ETF 한글 설명, optional). 캐시: Caffeine (현재가 30초, 캔들 10분, 분봉 1분, 검색 60분, 랭킹 10분, 시장지표 5분, 뉴스 30분, 미국인기종목 30분, 국내인기종목 60분)
+- `StockPriceDto`: `currency`(KRW/USD), `description`(미국 ETF 한글 설명, optional). `WatchlistItemDto`: `quantity`(보유수량), `purchasePrice`(평균단가) 포함. 캐시: Caffeine (현재가 30초, 캔들 10분, 분봉 1분, 검색 60분, 랭킹 10분, 시장지표 5분, 뉴스 30분, 미국인기종목 30분, 국내인기종목 60분)
 - 프론트 자동 갱신: 주식/시장지표 5분, 뉴스 30분 (별도 타이머)
 - 영속화: `data/watchlist.json`, `data/news-keywords.json` (`.gitignore`에 포함)
 
@@ -56,4 +56,4 @@ gradlew.bat test
 
 ## API 경로 규칙
 
-모든 REST API는 `/api/stock` 하위. 캔들: `/{symbol}/candle?timeframe=1|3|10|day`. 시장 지표: `/market-indicators` (코스피→코스닥→S&P500→나스닥→다우→환율→WTI→금→은). 환율: `/usdkrw-rate`. 뉴스: `/news?limit=N&keywords=k1,k2` (기본값·최대 10). 뉴스 키워드: `GET /news-keywords`, `PUT /news-keywords`. 인기 종목: `/top?type=stock|etf|us_stock|us_etf&limit=1~20` (국내 고정 인기 목록, 미국 실시간). 관심 종목 삭제: 복합키(`symbol|group`) 또는 symbol 단독. 대표지수(KOSPI/KOSDAQ/SP500/NASDAQ/DJI) 클릭 시 `/chart/{id}` 이동 (WTI/USDKRW는 클릭 없음).
+모든 REST API는 `/api/stock` 하위. 캔들: `/{symbol}/candle?timeframe=1|3|10|day`. 시장 지표: `/market-indicators` (코스피→코스닥→S&P500→나스닥→다우→환율→WTI→금→은). 환율: `/usdkrw-rate`. 뉴스: `/news?limit=N&keywords=k1,k2` (기본값·최대 10). 뉴스 키워드: `GET /news-keywords`, `PUT /news-keywords`. 인기 종목: `/top?type=stock|etf|us_stock|us_etf&limit=1~20` (국내 고정 인기 목록, 미국 실시간). 관심 종목 삭제: 복합키(`symbol|group`) 또는 symbol 단독. 포트폴리오 업데이트: `PUT /watchlist/{symbol}/portfolio` (quantity, purchasePrice). 대표지수(KOSPI/KOSDAQ/SP500/NASDAQ/DJI) 클릭 시 `/chart/{id}` 이동 (WTI/USDKRW는 클릭 없음).

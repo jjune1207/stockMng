@@ -736,6 +736,74 @@ body[data-bs-theme="light"] .watchlist-group-tag {
 }
 
 /* ──────────────────────────────────────────
+   포트폴리오 모달 — 다크 (기본)
+────────────────────────────────────────── */
+.portfolio-modal-content {
+    background-color: #1e2130;
+    color: #e9ecef;
+    border-color: #495057;
+}
+.portfolio-modal-header {
+    border-color: #495057 !important;
+}
+.portfolio-modal-close {
+    filter: invert(1) grayscale(100%) brightness(200%);
+}
+.portfolio-info-box {
+    border: 1px solid #495057;
+    background-color: rgba(255,255,255,0.04);
+}
+.portfolio-stat-box {
+    border: 1px solid #495057;
+    background-color: rgba(255,255,255,0.04);
+}
+.portfolio-input {
+    background-color: #2b2f3e;
+    color: #e9ecef;
+    border-color: #495057;
+}
+.portfolio-input::placeholder { color: #6c757d; }
+.portfolio-input:focus {
+    background-color: #2b2f3e;
+    color: #e9ecef;
+    border-color: #0dcaf0;
+    box-shadow: 0 0 0 0.2rem rgba(13,202,240,0.2);
+}
+
+/* 포트폴리오 모달 — 라이트 */
+[data-bs-theme="light"] .portfolio-modal-content {
+    background-color: #ffffff;
+    color: #212529;
+    border-color: #dee2e6;
+}
+[data-bs-theme="light"] .portfolio-modal-header {
+    border-color: #dee2e6 !important;
+}
+[data-bs-theme="light"] .portfolio-modal-close {
+    filter: none;
+}
+[data-bs-theme="light"] .portfolio-info-box {
+    border-color: #dee2e6;
+    background-color: #f8f9fa;
+}
+[data-bs-theme="light"] .portfolio-stat-box {
+    border-color: #dee2e6;
+    background-color: #f8f9fa;
+}
+[data-bs-theme="light"] .portfolio-input {
+    background-color: #ffffff;
+    color: #212529;
+    border-color: #ced4da;
+}
+[data-bs-theme="light"] .portfolio-input::placeholder { color: #adb5bd; }
+[data-bs-theme="light"] .portfolio-input:focus {
+    background-color: #ffffff;
+    color: #212529;
+    border-color: #0dcaf0;
+    box-shadow: 0 0 0 0.2rem rgba(13,202,240,0.2);
+}
+
+/* ──────────────────────────────────────────
    차트 페이지
 ────────────────────────────────────────── */
 #chartContainer {
