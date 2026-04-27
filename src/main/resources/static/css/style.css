@@ -30,17 +30,23 @@ body {
     flex: 1;
     min-height: 0;
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
 }
 
 /* 표시중인 탭 패널 */
 .tab-pane.show {
-    height: 100%;
+    flex: 1;
+    min-height: 0;
     overflow: hidden;
+    display: flex !important;
+    flex-direction: column;
 }
 
 /* 탭 패널 내 카드 - flex 컬럼으로 확장 */
 .tab-pane .card {
-    height: 100%;
+    flex: 1;
+    min-height: 0;
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -51,11 +57,14 @@ body {
     min-height: 0;
     overflow: hidden;
     padding: 0 !important;
+    display: flex;
+    flex-direction: column;
 }
 
 /* 테이블 영역 내부 스크롤 */
 .tab-pane .table-responsive {
-    height: 100%;
+    flex: 1;
+    min-height: 0;
     overflow-y: auto;
 }
 
@@ -415,6 +424,28 @@ body[data-bs-theme="light"] .watchlist-group-tag {
     color: #495057 !important;
     background-color: transparent !important;
     border-color: #6c757d !important;
+}
+
+/* 라이트 모드 검색창 */
+[data-bs-theme="light"] #searchInput {
+    background-color: #ffffff !important;
+    color: #212529 !important;
+    border-color: #ced4da !important;
+}
+
+[data-bs-theme="light"] #searchInput::placeholder {
+    color: #6c757d !important;
+}
+
+[data-bs-theme="light"] #searchInput:focus {
+    border-color: #86b7fe !important;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25) !important;
+}
+
+[data-bs-theme="light"] .input-group-lg .input-group-text {
+    background-color: #f8f9fa !important;
+    color: #495057 !important;
+    border-color: #ced4da !important;
 }
 
 [data-bs-theme="light"] .search-item {
@@ -801,6 +832,28 @@ body[data-bs-theme="light"] .watchlist-group-tag {
     color: #212529;
     border-color: #0dcaf0;
     box-shadow: 0 0 0 0.2rem rgba(13,202,240,0.2);
+}
+
+/* ──────────────────────────────────────────
+   관심종목 포트폴리오 요약 바
+   ────────────────────────────────────────── */
+.watchlist-summary-bar {
+    background-color: rgba(255,255,255,0.03);
+}
+.summary-stat-item {
+    min-width: 7rem;
+}
+.summary-divider {
+    width: 1px;
+    height: 2.2rem;
+    background-color: #495057;
+    flex-shrink: 0;
+}
+[data-bs-theme="light"] .watchlist-summary-bar {
+    background-color: rgba(0,0,0,0.03);
+}
+[data-bs-theme="light"] .summary-divider {
+    background-color: #dee2e6;
 }
 
 /* ──────────────────────────────────────────

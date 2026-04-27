@@ -309,8 +309,8 @@
                     <div class="d-flex align-items-center gap-3">
                         <h5 class="mb-0"><i class="bi bi-globe-americas me-2 text-success"></i>미국 주식 S&P500 상위 10개</h5>
                         <div class="btn-group btn-group-sm" role="group" id="usStockCurrencyToggle">
-                            <button class="btn btn-warning us-currency-btn active" data-table="usStock" data-cur="USD">$ USD</button>
-                            <button class="btn btn-outline-warning us-currency-btn" data-table="usStock" data-cur="KRW">₩ 원화</button>
+                            <button class="btn btn-warning us-currency-btn active" data-table="usStock" data-cur="KRW">₩ 원화</button>
+                            <button class="btn btn-outline-warning us-currency-btn" data-table="usStock" data-cur="USD">$ USD</button>
                         </div>
                     </div>
                     <small class="text-secondary" id="usStockUpdated"></small>
@@ -348,8 +348,8 @@
                     <div class="d-flex align-items-center gap-3">
                         <h5 class="mb-0"><i class="bi bi-collection-fill me-2 text-primary"></i>미국 주요 ETF 15개</h5>
                         <div class="btn-group btn-group-sm" role="group" id="usEtfCurrencyToggle">
-                            <button class="btn btn-warning us-currency-btn active" data-table="usEtf" data-cur="USD">$ USD</button>
-                            <button class="btn btn-outline-warning us-currency-btn" data-cur="KRW" data-table="usEtf">₩ 원화</button>
+                            <button class="btn btn-warning us-currency-btn active" data-cur="KRW" data-table="usEtf">₩ 원화</button>
+                            <button class="btn btn-outline-warning us-currency-btn" data-table="usEtf" data-cur="USD">$ USD</button>
                         </div>
                     </div>
                     <small class="text-secondary" id="usEtfUpdated"></small>
@@ -384,12 +384,15 @@
         <div class="tab-pane fade show active" id="watchlistPanel" role="tabpanel">
             <div class="card bg-dark border-secondary">
                 <div class="card-header border-secondary">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <div class="d-flex align-items-center gap-3">
-                            <h5 class="mb-0"><i class="bi bi-bookmark-star me-2 text-success"></i>내 관심 종목 / ETF</h5>
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <div class="d-flex align-items-center flex-wrap gap-2">
+                            <h5 class="mb-0 me-1"><i class="bi bi-bookmark-star me-2 text-success"></i>내 관심 종목 / ETF</h5>
                             <div class="btn-group btn-group-sm" role="group" id="watchlistCurrencyToggle">
-                                <button class="btn btn-warning watchlist-currency-btn active" data-cur="USD">$ USD</button>
-                                <button class="btn btn-outline-warning watchlist-currency-btn" data-cur="KRW">₩ 원화</button>
+                                <button class="btn btn-warning watchlist-currency-btn active" data-cur="KRW">₩ 원화</button>
+                                <button class="btn btn-outline-warning watchlist-currency-btn" data-cur="USD">$ USD</button>
+                            </div>
+                            <div class="d-flex flex-wrap gap-1" id="groupFilter">
+                                <button class="btn btn-sm btn-warning group-filter-btn active" data-group="__all__">전체</button>
                             </div>
                         </div>
                         <div class="d-flex align-items-center gap-2">
@@ -399,11 +402,10 @@
                             </button>
                         </div>
                     </div>
-                    <div class="d-flex flex-wrap gap-1" id="groupFilter">
-                        <button class="btn btn-sm btn-warning group-filter-btn active" data-group="__all__">전체</button>
-                    </div>
                 </div>
                 <div class="card-body p-0">
+                    <div id="watchlistSummaryBar" class="d-none watchlist-summary-bar px-3 py-2 border-bottom border-secondary">
+                    </div>
                     <div class="table-responsive">
                         <table class="table table-dark table-hover mb-0">
                             <thead>
@@ -746,9 +748,9 @@
 
     // 미국 주식 USD/KRW 토글 상태
     let usdKrwRate = 0;
-    let usStockDisplayCurrency = 'USD';
-    let usEtfDisplayCurrency = 'USD';
-    let watchlistDisplayCurrency = 'USD';
+    let usStockDisplayCurrency = 'KRW';
+    let usEtfDisplayCurrency = 'KRW';
+    let watchlistDisplayCurrency = 'KRW';
     let usStockPriceCache = []; // {item, price} 배열
     let usEtfPriceCache = [];   // {item, price} 배열
 
@@ -1159,6 +1161,77 @@
         });
     }
 
+    function calcGroupPortfolioSummary(filtered) {
+        let totalPurchaseKrw = 0;
+        let totalEvalKrw = 0;
+        let count = 0;
+        const rate = usdKrwRate > 0 ? usdKrwRate : 1;
+
+        filtered.forEach(r => {
+            const { item, price } = r;
+            if (!item.quantity || !item.purchasePrice || item.quantity <= 0 || item.purchasePrice <= 0) return;
+            if (!price) return;
+            count++;
+            const isUSD = price.currency === 'USD';
+            if (isUSD) {
+                totalPurchaseKrw += item.purchasePrice * item.quantity * rate;
+                totalEvalKrw += (price.currentPrice / 100) * item.quantity * rate;
+            } else {
+                totalPurchaseKrw += item.purchasePrice * item.quantity;
+                totalEvalKrw += price.currentPrice * item.quantity;
+            }
+        });
+
+        if (count === 0) return null;
+        const profitLoss = totalEvalKrw - totalPurchaseKrw;
+        const returnRate = totalPurchaseKrw > 0 ? (profitLoss / totalPurchaseKrw) * 100 : 0;
+        return { totalPurchaseKrw, totalEvalKrw, profitLoss, returnRate };
+    }
+
+    function renderWatchlistSummary(filtered) {
+        const bar = document.getElementById('watchlistSummaryBar');
+        const summary = calcGroupPortfolioSummary(filtered);
+
+        if (!summary) {
+            bar.classList.add('d-none');
+            return;
+        }
+
+        const { totalPurchaseKrw, totalEvalKrw, profitLoss, returnRate } = summary;
+        const isUSDView = watchlistDisplayCurrency === 'USD' && usdKrwRate > 0;
+        const rate = usdKrwRate > 0 ? usdKrwRate : 1;
+
+        function fmtSummaryAmt(krwAmt) {
+            if (isUSDView) {
+                const usd = krwAmt / rate;
+                return '$' + usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            }
+            return '₩' + formatNumber(Math.round(krwAmt));
+        }
+
+        const plColor = profitLoss > 0 ? 'price-up' : (profitLoss < 0 ? 'price-down' : 'price-flat');
+        const rrColor = returnRate > 0 ? 'price-up' : (returnRate < 0 ? 'price-down' : 'price-flat');
+        const plSign = profitLoss >= 0 ? '+' : '-';
+        const rrSign = returnRate > 0 ? '+' : '';
+        const plFormatted = plSign + fmtSummaryAmt(Math.abs(profitLoss));
+
+        bar.innerHTML =
+            '<div class="d-flex flex-wrap gap-3 align-items-center">' +
+            '<div class="summary-stat-item"><div class="text-secondary small mb-1">매입금액</div>' +
+            '<div class="fw-semibold">' + fmtSummaryAmt(totalPurchaseKrw) + '</div></div>' +
+            '<div class="summary-divider"></div>' +
+            '<div class="summary-stat-item"><div class="text-secondary small mb-1">평가금액</div>' +
+            '<div class="fw-semibold">' + fmtSummaryAmt(totalEvalKrw) + '</div></div>' +
+            '<div class="summary-divider"></div>' +
+            '<div class="summary-stat-item"><div class="text-secondary small mb-1">평가손익</div>' +
+            '<div class="fw-semibold ' + plColor + '">' + plFormatted + '</div></div>' +
+            '<div class="summary-divider"></div>' +
+            '<div class="summary-stat-item"><div class="text-secondary small mb-1">수익율</div>' +
+            '<div class="fw-semibold ' + rrColor + '">' + rrSign + returnRate.toFixed(2) + '%</div></div>' +
+            '</div>';
+        bar.classList.remove('d-none');
+    }
+
     function renderWatchlistTable() {
         const tbody = document.getElementById('watchlistTableBody');
         let filtered = watchlistPriceCache;
@@ -1173,6 +1246,8 @@
         } else {
             filtered = filtered.filter(r => r.item.group === currentGroupFilter);
         }
+
+        renderWatchlistSummary(filtered);
 
         if (filtered.length === 0) {
             tbody.innerHTML = '<tr><td colspan="10" class="text-center py-4 text-secondary">' +
