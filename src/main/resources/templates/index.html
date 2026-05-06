@@ -384,23 +384,29 @@
         <div class="tab-pane fade show active" id="watchlistPanel" role="tabpanel">
             <div class="card bg-dark border-secondary">
                 <div class="card-header border-secondary">
-                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
                         <div class="d-flex align-items-center flex-wrap gap-2">
                             <h5 class="mb-0 me-1"><i class="bi bi-bookmark-star me-2 text-success"></i>내 관심 종목 / ETF</h5>
                             <div class="btn-group btn-group-sm" role="group" id="watchlistCurrencyToggle">
                                 <button class="btn btn-warning watchlist-currency-btn active" data-cur="KRW">₩ 원화</button>
                                 <button class="btn btn-outline-warning watchlist-currency-btn" data-cur="USD">$ USD</button>
                             </div>
-                            <div class="d-flex flex-wrap gap-1" id="groupFilter">
-                                <button class="btn btn-sm btn-warning group-filter-btn active" data-group="__all__">전체</button>
-                            </div>
                         </div>
                         <div class="d-flex align-items-center gap-2">
                             <small class="text-secondary" id="watchlistUpdated"></small>
+                            <button class="btn btn-sm btn-outline-info" onclick="promptAddOwner()" title="소유자 추가">
+                                <i class="bi bi-person-plus"></i>
+                            </button>
                             <button class="btn btn-sm btn-outline-success" onclick="promptAddGroup()" title="그룹 추가">
                                 <i class="bi bi-folder-plus"></i>
                             </button>
                         </div>
+                    </div>
+                    <div class="d-flex flex-wrap align-items-center gap-1 mb-1" id="ownerFilter">
+                        <button class="btn btn-sm btn-info owner-filter-btn active" data-owner="__all__">전체 소유자</button>
+                    </div>
+                    <div class="d-flex flex-wrap gap-1" id="groupFilter">
+                        <button class="btn btn-sm btn-warning group-filter-btn active" data-group="__all__">전체</button>
                     </div>
                 </div>
                 <div class="card-body p-0">
@@ -743,6 +749,8 @@
     let currentGroupFilter = '__all__';
     let currentSort = { key: 'weight', asc: false };
     let groupList = [];
+    let ownerList = [];
+    let currentOwnerFilter = '__all__';
     let groupSelectorTarget = null; // 관심추가 시 그룹 선택 대상
     let dragSrcGroup = null;
 
@@ -757,24 +765,29 @@
     (function() { applyTheme(getStoredTheme()); })();
 
     const PREFERRED_GROUP_ORDER = ['ISA', '국내주식', '연금저축', '미국주식'];
+    const OWNER_GROUP_ORDERS_KEY = 'ownerGroupOrders';
 
-    function loadGroupOrder() {
+    function loadGroupOrder(ownerName) {
         try {
-            const saved = localStorage.getItem('watchlistGroupOrder');
-            return saved ? JSON.parse(saved) : null;
+            const saved = localStorage.getItem(OWNER_GROUP_ORDERS_KEY);
+            const orders = saved ? JSON.parse(saved) : {};
+            return orders[ownerName || '__all__'] || null;
         } catch (e) { return null; }
     }
 
-    function saveGroupOrder() {
-        localStorage.setItem('watchlistGroupOrder', JSON.stringify(groupList));
+    function saveGroupOrder(ownerName) {
+        try {
+            const saved = localStorage.getItem(OWNER_GROUP_ORDERS_KEY);
+            const orders = saved ? JSON.parse(saved) : {};
+            orders[ownerName || '__all__'] = groupList;
+            localStorage.setItem(OWNER_GROUP_ORDERS_KEY, JSON.stringify(orders));
+        } catch (e) {}
     }
 
-    function applyGroupOrder(serverGroups) {
-        // 1) 선호 순서에 있는 그룹 먼저 (서버에 실제 존재하는 것만)
+    function applyGroupOrder(serverGroups, ownerName) {
         const preferred = PREFERRED_GROUP_ORDER.filter(g => serverGroups.includes(g));
-        // 2) 선호 순서에 없는 나머지 그룹: localStorage 드래그 순서 → 없으면 알파벳
         const rest = serverGroups.filter(g => !PREFERRED_GROUP_ORDER.includes(g));
-        const savedOrder = loadGroupOrder();
+        const savedOrder = loadGroupOrder(ownerName);
         if (savedOrder) {
             const savedRest = savedOrder.filter(g => rest.includes(g));
             const newRest = rest.filter(g => !savedOrder.includes(g));
@@ -1033,9 +1046,20 @@
             watchlistMap.clear();
             items.forEach(item => watchlistMap.set(item.symbol, item));
 
-            // 그룹 목록 갱신 (저장된 순서 적용)
-            const rawGroups = [...new Set(items.map(i => i.group).filter(g => g && g.trim()))].sort();
-            groupList = applyGroupOrder(rawGroups);
+            // 소유자 목록 갱신
+            ownerList = [...new Set(items.map(i => i.owner).filter(o => o && o.trim()))].sort();
+            // 현재 소유자 필터가 유효한지 확인
+            if (currentOwnerFilter !== '__all__' && !ownerList.includes(currentOwnerFilter)) {
+                currentOwnerFilter = '__all__';
+            }
+            renderOwnerFilter();
+
+            // 현재 소유자 기준으로 그룹 목록 갱신
+            const filteredItems = currentOwnerFilter === '__all__'
+                ? items
+                : items.filter(i => i.owner === currentOwnerFilter);
+            const rawGroups = [...new Set(filteredItems.map(i => i.group).filter(g => g && g.trim()))].sort();
+            groupList = applyGroupOrder(rawGroups, currentOwnerFilter === '__all__' ? null : currentOwnerFilter);
             renderGroupFilter();
 
             if (!items || items.length === 0) {
@@ -1068,16 +1092,92 @@
         return 'btn-outline-secondary';
     }
 
+    function renderOwnerFilter() {
+        const container = document.getElementById('ownerFilter');
+        if (!container) return;
+        container.innerHTML = '';
+
+        // "전체 소유자" 버튼
+        const allBtn = document.createElement('button');
+        allBtn.className = 'btn btn-sm owner-filter-btn ' + (currentOwnerFilter === '__all__' ? 'btn-primary' : 'btn-outline-primary');
+        allBtn.dataset.owner = '__all__';
+        allBtn.textContent = '전체 소유자';
+        allBtn.addEventListener('click', function() {
+            currentOwnerFilter = '__all__';
+            currentGroupFilter = '__all__';
+            // 전체 소유자 기준 그룹 목록 재계산
+            const allItems = watchlistPriceCache.map(r => r.item);
+            const rawGroups = [...new Set(allItems.map(i => i.group).filter(g => g && g.trim()))].sort();
+            groupList = applyGroupOrder(rawGroups, null);
+            renderOwnerFilter();
+            renderGroupFilter();
+            renderWatchlistTable();
+        });
+        container.appendChild(allBtn);
+
+        // 소유자별 버튼
+        ownerList.forEach(owner => {
+            const ownerBtn = document.createElement('button');
+            ownerBtn.className = 'btn btn-sm owner-filter-btn ' + (currentOwnerFilter === owner ? 'btn-primary' : 'btn-outline-primary');
+            ownerBtn.dataset.owner = owner;
+
+            const nameSpan = document.createElement('span');
+            nameSpan.textContent = owner;
+            ownerBtn.appendChild(nameSpan);
+
+            // 수정 아이콘
+            const editIcon = document.createElement('i');
+            editIcon.className = 'bi bi-pencil ms-1 owner-edit-btn';
+            editIcon.title = '소유자 이름 변경';
+            editIcon.addEventListener('click', function(e) {
+                e.stopPropagation();
+                promptRenameOwner(owner);
+            });
+            ownerBtn.appendChild(editIcon);
+
+            // 삭제 아이콘
+            const delIcon = document.createElement('i');
+            delIcon.className = 'bi bi-x-circle ms-1 owner-delete-btn';
+            delIcon.title = '소유자 삭제';
+            delIcon.addEventListener('click', function(e) {
+                e.stopPropagation();
+                if (confirm('"' + owner + '" 소유자를 삭제하시겠습니까?\n소속 종목도 함께 삭제됩니다.')) {
+                    deleteOwner(owner);
+                }
+            });
+            ownerBtn.appendChild(delIcon);
+
+            // 클릭 → 필터
+            ownerBtn.addEventListener('click', function(e) {
+                if (e.target.classList.contains('owner-edit-btn') || e.target.classList.contains('owner-delete-btn')) return;
+                currentOwnerFilter = owner;
+                currentGroupFilter = '__all__';
+                const filteredItems = watchlistPriceCache.map(r => r.item).filter(i => i.owner === owner);
+                const rawGroups = [...new Set(filteredItems.map(i => i.group).filter(g => g && g.trim()))].sort();
+                groupList = applyGroupOrder(rawGroups, owner);
+                renderOwnerFilter();
+                renderGroupFilter();
+                renderWatchlistTable();
+            });
+
+            container.appendChild(ownerBtn);
+        });
+    }
+
     function renderGroupFilter() {
         const container = document.getElementById('groupFilter');
         container.innerHTML = '';
+
+        // 현재 소유자 필터에 맞는 캐시만 사용
+        const visibleCache = currentOwnerFilter === '__all__'
+            ? watchlistPriceCache
+            : watchlistPriceCache.filter(r => r.item.owner === currentOwnerFilter);
 
         // "전체" 버튼 (드래그 불가)
         const allBtn = document.createElement('button');
         allBtn.className = 'btn btn-sm group-filter-btn ' + (currentGroupFilter === '__all__' ? 'btn-warning' : groupInactiveClass());
         allBtn.dataset.group = '__all__';
-        const uniqueCount = new Set(watchlistPriceCache.map(r => r.item.symbol)).size;
-        allBtn.textContent = '전체 (' + uniqueCount + ')';
+        allBtn.textContent = '전체 (' + visibleCache.length + ')';
         allBtn.addEventListener('click', function() {
             currentGroupFilter = '__all__';
             renderGroupFilter();
@@ -1087,7 +1187,7 @@
 
         // 그룹 버튼들 (드래그 가능)
         groupList.forEach(g => {
-            const count = watchlistPriceCache.filter(r => r.item.group === g).length;
+            const count = visibleCache.filter(r => r.item.group === g).length;
             const isActive = currentGroupFilter === g;
 
             const btn = document.createElement('button');
@@ -1099,13 +1199,22 @@
             const label = document.createTextNode(escHtml(g) + ' (' + count + ') ');
             btn.appendChild(label);
 
+            // 삭제 아이콘: 전체 소유자 모드에서는 비활성화
             const delIcon = document.createElement('i');
             delIcon.className = 'bi bi-x-circle ms-1 group-delete-btn';
-            delIcon.title = '그룹 삭제';
+            delIcon.title = currentOwnerFilter === '__all__' ? '소유자를 선택하면 그룹을 삭제할 수 있습니다' : '그룹 삭제';
+            if (currentOwnerFilter === '__all__') {
+                delIcon.style.opacity = '0.3';
+                delIcon.style.cursor = 'not-allowed';
+            }
             delIcon.addEventListener('click', function(e) {
                 e.stopPropagation();
+                if (currentOwnerFilter === '__all__') {
+                    alert('소유자를 먼저 선택한 후 그룹을 삭제해 주세요.');
+                    return;
+                }
                 if (confirm('"' + g + '" 그룹을 삭제하시겠습니까?\n소속 종목도 함께 삭제됩니다.')) {
-                    deleteGroup(g);
+                    deleteGroup(currentOwnerFilter, g);
                 }
             });
             btn.appendChild(delIcon);
@@ -1152,7 +1261,7 @@
 
                 groupList.splice(fromIdx, 1);
                 groupList.splice(toIdx, 0, dragSrcGroup);
-                saveGroupOrder();
+                saveGroupOrder(currentOwnerFilter === '__all__' ? null : currentOwnerFilter);
                 renderGroupFilter();
                 dragSrcGroup = null;
             });
@@ -1234,16 +1343,12 @@
 
     function renderWatchlistTable() {
         const tbody = document.getElementById('watchlistTableBody');
-        let filtered = watchlistPriceCache;
-        if (currentGroupFilter === '__all__') {
-            // 전체 탭: symbol 기준 중복 제거 (첫 번째 항목만 표시)
-            const seen = new Set();
-            filtered = filtered.filter(r => {
-                if (seen.has(r.item.symbol)) return false;
-                seen.add(r.item.symbol);
-                return true;
-            });
-        } else {
+        // 소유자 필터 적용
+        let filtered = currentOwnerFilter === '__all__'
+            ? watchlistPriceCache
+            : watchlistPriceCache.filter(r => r.item.owner === currentOwnerFilter);
+        // 그룹 필터 적용 (소유자 필터 후)
+        if (currentGroupFilter !== '__all__') {
             filtered = filtered.filter(r => r.item.group === currentGroupFilter);
         }
 
@@ -1264,8 +1369,11 @@
 
         // 정렬
         filtered = [...filtered].sort((a, b) => {
-            // 전체 탭: 그룹 순서(PREFERRED_GROUP_ORDER) 우선
+            // 전체 탭: 소유자 → 그룹 순서 우선
             if (currentGroupFilter === '__all__') {
+                if (a.item.owner !== b.item.owner) {
+                    return a.item.owner.localeCompare(b.item.owner);
+                }
                 const gi = g => {
                     const idx = PREFERRED_GROUP_ORDER.indexOf(g);
                     return idx === -1 ? PREFERRED_GROUP_ORDER.length : idx;
@@ -1440,20 +1548,31 @@
             '</tr>';
     }
 
-    function buildGroupSelect(symbol, currentGroup) {
-        let opts = groupList.map(g =>
+    function buildGroupSelect(symbol, owner, currentGroup) {
+        // 해당 소유자의 그룹 목록만 옵션으로 제공
+        const ownerGroups = owner
+            ? [...new Set(watchlistPriceCache.filter(r => r.item.owner === owner).map(r => r.item.group).filter(g => g && g.trim()))]
+            : groupList;
+        const allGroups = [...new Set([...ownerGroups, ...groupList])];
+        let opts = allGroups.map(g =>
             '<option value="' + escHtml(g) + '"' + (g === currentGroup ? ' selected' : '') + '>' + escHtml(g) + '</option>'
         ).join('');
-        const compositeKey = symbol + '|' + currentGroup;
+        const compositeKey = symbol + '|' + (owner || '') + '|' + currentGroup;
         return '<select class="form-select form-select-sm bg-dark text-light border-secondary group-move-select" ' +
             'data-composite-key="' + escHtml(compositeKey) + '" data-symbol="' + escHtml(symbol) + '" ' +
+            'data-owner="' + escHtml(owner || '') + '" ' +
             'style="width:auto;min-width:70px;font-size:0.75rem;padding:2px 6px">' +
             opts + '</select>';
     }
 
     function buildGroupBadges(symbol) {
-        const groups = watchlistPriceCache.filter(r => r.item.symbol === symbol).map(r => r.item.group);
-        return groups.map(g => '<span class="border rounded me-1 px-2 watchlist-group-tag" style="font-size:0.7rem;display:inline-block;line-height:1.6">' + escHtml(g) + '</span>').join('');
+        const entries = watchlistPriceCache.filter(r => r.item.symbol === symbol);
+        if (entries.length === 0) return '';
+        const showOwner = ownerList.length > 1;
+        return entries.map(r => {
+            const label = showOwner ? escHtml(r.item.owner) + '/' + escHtml(r.item.group) : escHtml(r.item.group);
+            return '<span class="border rounded me-1 px-2 watchlist-group-tag" style="font-size:0.7rem;display:inline-block;line-height:1.6">' + label + '</span>';
+        }).join('');
     }
 
     const ETF_NAME_RE = /KODEX|TIGER|KOSEF|ARIRANG|ACE|RISE|SOL|HANARO|KBSTAR|ETF|ETN/i;
@@ -1511,12 +1630,12 @@
         const isAllView = currentGroupFilter === '__all__';
         const groupCell = isAllView
             ? '<td>' + buildGroupBadges(item.symbol) + '</td>'
-            : '<td>' + buildGroupSelect(item.symbol, item.group) + '</td>';
+            : '<td>' + buildGroupSelect(item.symbol, item.owner, item.group) + '</td>';
         const deleteBtn = isAllView
             ? '<button class="btn btn-sm btn-outline-danger" data-action="remove-watch" data-symbol="' + escHtml(item.symbol) + '">삭제</button>'
-            : '<button class="btn btn-sm btn-outline-danger" data-action="remove-watch" data-symbol="' + escHtml(item.symbol + '|' + item.group) + '">삭제</button>';
+            : '<button class="btn btn-sm btn-outline-danger" data-action="remove-watch" data-symbol="' + escHtml(item.symbol + '|' + (item.owner || '나') + '|' + item.group) + '">삭제</button>';
         const portfolioBtn = '<button class="btn btn-sm btn-outline-info ms-1" data-action="portfolio" ' +
-            'data-symbol="' + escHtml(item.symbol) + '" data-group="' + escHtml(item.group) + '" title="보유 정보 입력">' +
+            'data-symbol="' + escHtml(item.symbol) + '" data-owner="' + escHtml(item.owner || '나') + '" data-group="' + escHtml(item.group) + '" title="보유 정보 입력">' +
             '<i class="bi bi-wallet2"></i></button>';
 
         const hasPortfolio = item.quantity > 0 && item.purchasePrice > 0;
@@ -1583,12 +1702,12 @@
         const isAllView = currentGroupFilter === '__all__';
         const groupCell = isAllView
             ? '<td>' + buildGroupBadges(item.symbol) + '</td>'
-            : '<td>' + buildGroupSelect(item.symbol, item.group) + '</td>';
+            : '<td>' + buildGroupSelect(item.symbol, item.owner, item.group) + '</td>';
         const deleteBtn = isAllView
             ? '<button class="btn btn-sm btn-outline-danger" data-action="remove-watch" data-symbol="' + escHtml(item.symbol) + '">삭제</button>'
-            : '<button class="btn btn-sm btn-outline-danger" data-action="remove-watch" data-symbol="' + escHtml(item.symbol + '|' + item.group) + '">삭제</button>';
+            : '<button class="btn btn-sm btn-outline-danger" data-action="remove-watch" data-symbol="' + escHtml(item.symbol + '|' + (item.owner || '나') + '|' + item.group) + '">삭제</button>';
         const portfolioBtn = '<button class="btn btn-sm btn-outline-info ms-1" data-action="portfolio" ' +
-            'data-symbol="' + escHtml(item.symbol) + '" data-group="' + escHtml(item.group) + '" title="보유 정보 입력">' +
+            'data-symbol="' + escHtml(item.symbol) + '" data-owner="' + escHtml(item.owner || '나') + '" data-group="' + escHtml(item.group) + '" title="보유 정보 입력">' +
             '<i class="bi bi-wallet2"></i></button>';
 
         return '<tr data-symbol="' + escHtml(item.symbol) + '" style="cursor:pointer">' +
@@ -1729,7 +1848,7 @@
         const qty = parseFloat(document.getElementById('portfolioQuantity').value) || null;
         const avgPrice = parseFloat(document.getElementById('portfolioAvgPrice').value) || null;
 
-        const compositeKey = item.symbol + (item.group ? '|' + item.group : '');
+        const compositeKey = item.symbol + '|' + (item.owner || '나') + '|' + (item.group || '');
         const res = await fetch('/api/stock/watchlist/' + encodeURIComponent(compositeKey) + '/portfolio', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
@@ -1743,7 +1862,7 @@
 
         // 캐시 내 item 갱신
         watchlistPriceCache.forEach(r => {
-            const updated = items.find(i => i.symbol === r.item.symbol && i.group === r.item.group);
+            const updated = items.find(i => i.symbol === r.item.symbol && i.owner === r.item.owner && i.group === r.item.group);
             if (updated) r.item = updated;
         });
         watchlistMap.clear();
@@ -1761,7 +1880,7 @@
         document.getElementById('portfolioAvgPrice').value = '';
         updatePortfolioCalc();
 
-        const compositeKey = item.symbol + (item.group ? '|' + item.group : '');
+        const compositeKey = item.symbol + '|' + (item.owner || '나') + '|' + (item.group || '');
         const res = await fetch('/api/stock/watchlist/' + encodeURIComponent(compositeKey) + '/portfolio', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
@@ -1771,7 +1890,7 @@
         const items = await res.json();
 
         watchlistPriceCache.forEach(r => {
-            const updated = items.find(i => i.symbol === r.item.symbol && i.group === r.item.group);
+            const updated = items.find(i => i.symbol === r.item.symbol && i.owner === r.item.owner && i.group === r.item.group);
             if (updated) r.item = updated;
         });
         watchlistMap.clear();
@@ -1966,8 +2085,10 @@
                     });
             } else if (action === 'portfolio') {
                 const symbol = actionEl.dataset.symbol;
+                const owner = actionEl.dataset.owner;
                 const group = actionEl.dataset.group;
-                const cached = watchlistPriceCache.find(r => r.item.symbol === symbol && r.item.group === group)
+                const cached = watchlistPriceCache.find(r => r.item.symbol === symbol && r.item.owner === owner && r.item.group === group)
+                    || watchlistPriceCache.find(r => r.item.symbol === symbol && r.item.group === group)
                     || watchlistPriceCache.find(r => r.item.symbol === symbol);
                 if (cached) {
                     openPortfolioModal(cached.item, cached.price);
@@ -1998,7 +2119,7 @@
             watchlistMap.clear();
             items.forEach(item => watchlistMap.set(item.symbol, item));
             watchlistPriceCache.forEach(r => {
-                const updated = items.find(i => i.symbol === r.item.symbol && i.group === r.item.group);
+                const updated = items.find(i => i.symbol === r.item.symbol && i.owner === r.item.owner && i.group === r.item.group);
                 if (updated) r.item = updated;
             });
             const rawGroups = [...new Set(items.map(i => i.group).filter(g => g && g.trim()))].sort();
@@ -2023,7 +2144,107 @@
         renderWatchlistTable();
     });
 
+    function promptAddOwner() {
+        const existing = document.getElementById('addOwnerInline');
+        if (existing) { existing.remove(); return; }
+
+        const container = document.getElementById('ownerFilter');
+        if (!container) return;
+        const wrapper = document.createElement('div');
+        wrapper.id = 'addOwnerInline';
+        wrapper.className = 'd-inline-flex align-items-center gap-1 ms-1';
+        wrapper.innerHTML =
+            '<input type="text" class="form-control form-control-sm bg-dark text-light border-secondary" ' +
+            'id="newOwnerInput" placeholder="소유자명" style="width:100px;font-size:0.78rem">' +
+            '<button class="btn btn-sm btn-success" id="confirmAddOwner" style="font-size:0.75rem">확인</button>' +
+            '<button class="btn btn-sm btn-outline-secondary" id="cancelAddOwner" style="font-size:0.75rem">취소</button>';
+        container.appendChild(wrapper);
+
+        const input = document.getElementById('newOwnerInput');
+        input.focus();
+
+        function doAdd() {
+            const trimmed = input.value.trim();
+            if (!trimmed) return;
+            if (ownerList.includes(trimmed)) { alert('이미 존재하는 소유자입니다.'); return; }
+            // 소유자만 추가하고 — 실제 종목이 없으면 서버엔 저장 안 되므로 UI만 반영
+            ownerList.push(trimmed);
+            wrapper.remove();
+            renderOwnerFilter();
+        }
+
+        document.getElementById('confirmAddOwner').addEventListener('click', doAdd);
+        document.getElementById('cancelAddOwner').addEventListener('click', () => wrapper.remove());
+        input.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') doAdd();
+            if (e.key === 'Escape') wrapper.remove();
+        });
+    }
+
+    function promptRenameOwner(owner) {
+        const newName = prompt('"' + owner + '" 소유자의 새 이름을 입력하세요:', owner);
+        if (!newName || !newName.trim()) return;
+        const trimmed = newName.trim();
+        if (trimmed === owner) return;
+        if (ownerList.includes(trimmed)) { alert('이미 존재하는 소유자 이름입니다.'); return; }
+        renameOwner(owner, trimmed);
+    }
+
+    async function renameOwner(oldName, newName) {
+        try {
+            const res = await fetch('/api/stock/watchlist/owners/' + encodeURIComponent(oldName), {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ newName })
+            });
+            if (!res.ok) throw new Error('소유자 이름 변경 실패');
+            const items = await res.json();
+            watchlistMap.clear();
+            items.forEach(item => watchlistMap.set(item.symbol, item));
+            watchlistPriceCache.forEach(r => {
+                const updated = items.find(i =>
+                    i.symbol === r.item.symbol && i.group === r.item.group && i.owner === newName &&
+                    r.item.owner === oldName);
+                if (updated) r.item = updated;
+            });
+            if (currentOwnerFilter === oldName) currentOwnerFilter = newName;
+            ownerList = ownerList.map(o => o === oldName ? newName : o);
+            renderOwnerFilter();
+            renderWatchlistTable();
+        } catch (err) {
+            alert(err.message);
+        }
+    }
+
+    async function deleteOwner(ownerName) {
+        try {
+            const res = await fetch('/api/stock/watchlist/owners/' + encodeURIComponent(ownerName), { method: 'DELETE' });
+            if (!res.ok) throw new Error('소유자 삭제 실패');
+            const items = await res.json();
+            watchlistMap.clear();
+            items.forEach(item => watchlistMap.set(item.symbol, item));
+            watchlistPriceCache = watchlistPriceCache.filter(r => r.item.owner !== ownerName);
+            ownerList = ownerList.filter(o => o !== ownerName);
+            if (currentOwnerFilter === ownerName) {
+                currentOwnerFilter = '__all__';
+                currentGroupFilter = '__all__';
+                const rawGroups = [...new Set(items.map(i => i.group).filter(g => g && g.trim()))].sort();
+                groupList = applyGroupOrder(rawGroups, null);
+            }
+            renderOwnerFilter();
+            renderGroupFilter();
+            renderWatchlistTable();
+        } catch (err) {
+            alert(err.message);
+        }
+    }
+
     function promptAddGroup() {
+        if (currentOwnerFilter === '__all__' && ownerList.length > 1) {
+            alert('소유자를 먼저 선택한 후 그룹을 추가해 주세요.');
+            return;
+        }
+
         const existing = document.getElementById('addGroupInline');
         if (existing) { existing.remove(); return; }
 
@@ -2046,7 +2267,7 @@
             if (!trimmed) return;
             if (groupList.includes(trimmed)) { alert('이미 존재하는 그룹입니다.'); return; }
             groupList.push(trimmed);
-            saveGroupOrder();
+            saveGroupOrder(currentOwnerFilter === '__all__' ? null : currentOwnerFilter);
             wrapper.remove();
             renderGroupFilter();
         }
@@ -2059,22 +2280,18 @@
         });
     }
 
-    async function deleteGroup(groupName) {
+    async function deleteGroup(ownerName, groupName) {
         try {
-            const res = await fetch('/api/stock/watchlist/groups/' + encodeURIComponent(groupName), { method: 'DELETE' });
+            const ownerParam = ownerName ? '?owner=' + encodeURIComponent(ownerName) : '';
+            const res = await fetch('/api/stock/watchlist/groups/' + encodeURIComponent(groupName) + ownerParam, { method: 'DELETE' });
             if (!res.ok) throw new Error('그룹 삭제 실패');
             const items = await res.json();
             watchlistMap.clear();
             items.forEach(item => watchlistMap.set(item.symbol, item));
             watchlistPriceCache = watchlistPriceCache.filter(r =>
-                items.some(i => i.symbol === r.item.symbol && i.group === r.item.group));
-            watchlistPriceCache.forEach(r => {
-                const updated = items.find(i => i.symbol === r.item.symbol && i.group === r.item.group);
-                if (updated) r.item = updated;
-            });
-            // 삭제된 그룹을 groupList에서도 제거
+                !(r.item.group === groupName && r.item.owner === ownerName));
             groupList = groupList.filter(g => g !== groupName);
-            saveGroupOrder();
+            saveGroupOrder(ownerName);
             if (currentGroupFilter === groupName) currentGroupFilter = '__all__';
             renderGroupFilter();
             renderWatchlistTable();
@@ -2090,32 +2307,54 @@
         const popup = document.createElement('div');
         popup.id = 'groupSelectorPopup';
         popup.className = (isDark ? 'bg-dark border-secondary' : 'bg-white border-light-subtle') + ' border rounded shadow';
-        popup.style.cssText = 'position:fixed;z-index:2000;min-width:140px;max-height:250px;overflow-y:auto;' +
+        popup.style.cssText = 'position:fixed;z-index:2000;min-width:160px;max-height:350px;overflow-y:auto;' +
             'top:' + (rect.bottom + 4) + 'px;left:' + rect.left + 'px;';
 
         const header = document.createElement('div');
         header.className = 'px-3 py-2 border-bottom ' + (isDark ? 'border-secondary' : 'border-light-subtle') + ' text-secondary small';
-        header.textContent = '그룹 선택';
+        header.textContent = ownerList.length > 1 ? '소유자 / 그룹 선택' : '그룹 선택';
         popup.appendChild(header);
 
-        if (groupList.length === 0) {
-            const empty = document.createElement('div');
-            empty.className = 'px-3 py-2 text-secondary small';
-            empty.textContent = '그룹이 없습니다.';
-            popup.appendChild(empty);
-        } else {
-            groupList.forEach(g => {
-                const item = document.createElement('div');
-                item.className = 'px-3 py-2 ' + (isDark ? 'text-light' : 'text-dark') + ' search-item';
-                item.style.cursor = 'pointer';
-                item.textContent = g;
-                item.addEventListener('click', function() {
-                    closeGroupSelector();
-                    doAddWatch(btnEl, g);
+        // 소유자가 여러 명이면 소유자별로 그룹을 섹션으로 표시
+        const displayOwners = ownerList.length > 0 ? ownerList : ['나'];
+        displayOwners.forEach(owner => {
+            const ownerGroups = [...new Set(
+                watchlistPriceCache
+                    .filter(r => r.item.owner === owner)
+                    .map(r => r.item.group)
+                    .filter(g => g && g.trim())
+            )];
+            // 소유자 추가 그룹(UI에만 있는)도 포함
+            if (currentOwnerFilter === owner) {
+                groupList.forEach(g => { if (!ownerGroups.includes(g)) ownerGroups.push(g); });
+            }
+
+            if (ownerList.length > 1) {
+                const ownerHeader = document.createElement('div');
+                ownerHeader.className = 'px-3 py-1 fw-bold small ' + (isDark ? 'text-warning' : 'text-primary');
+                ownerHeader.textContent = owner;
+                popup.appendChild(ownerHeader);
+            }
+
+            if (ownerGroups.length === 0) {
+                const empty = document.createElement('div');
+                empty.className = 'px-4 py-1 text-secondary small';
+                empty.textContent = '그룹 없음';
+                popup.appendChild(empty);
+            } else {
+                ownerGroups.forEach(g => {
+                    const item = document.createElement('div');
+                    item.className = 'px-' + (ownerList.length > 1 ? '4' : '3') + ' py-2 ' + (isDark ? 'text-light' : 'text-dark') + ' search-item';
+                    item.style.cursor = 'pointer';
+                    item.textContent = g;
+                    item.addEventListener('click', function() {
+                        closeGroupSelector();
+                        doAddWatch(btnEl, owner, g);
+                    });
+                    popup.appendChild(item);
                 });
-                popup.appendChild(item);
-            });
-        }
+            }
+        });
 
         document.body.appendChild(popup);
         groupSelectorTarget = btnEl;
@@ -2139,12 +2378,13 @@
         }
     }
 
-    function doAddWatch(btnEl, group) {
+    function doAddWatch(btnEl, owner, group) {
         const payload = {
             symbol: btnEl.dataset.symbol,
             name: btnEl.dataset.name,
             market: btnEl.dataset.market,
             type: btnEl.dataset.type,
+            owner: owner || (ownerList.length > 0 ? ownerList[0] : '나'),
             group: group,
         };
         addWatchlistItem(payload)

@@ -12,6 +12,7 @@ DB 없이 네이버 증권 API와 Yahoo Finance를 활용하여 거래량 상위
 - **관심 종목 관리** (그룹별 분류, 같은 종목 여러 그룹 중복 등록, JSON 파일 영속화)
 - **포트폴리오 관리**: 보유수량/평균단가 입력, 매입금액·평가금액·수익금·수익률 자동 계산, 포트폴리오 비중 표시
 - **포트폴리오 요약 바**: 관심 종목 탭 상단에 전체(또는 그룹별) 매입금액·평가금액·평가손익·수익률 요약 표시 (USD/KRW 토글 연동)
+- **소유자 관리**: 소유자 추가/삭제, 소유자 필터 버튼으로 포트폴리오 분리 조회. 복합키 `symbol|owner|group` 3파트로 같은 종목을 여러 소유자·그룹에 독립 등록 가능
 - **그룹 관리**: 그룹 추가/삭제/이름 변경, 드래그&드롭 탭 순서 변경, 빈 그룹 유지
 - **캔들스틱 차트** (TradingView Lightweight Charts v4)
 - **타임프레임**: 1분봉 / 3분봉 / 10분봉 (최근 5영업일) / 일봉 (최대 3년)
@@ -85,9 +86,10 @@ http://localhost:8080
 - **주요 ETF 탭**: 인기 ETF 16개 (고정 큐레이션 목록)
 - **미국 주식 탭**: S&P500 상위 10개 (KRW/USD 토글, 기본값 원화)
 - **미국 ETF 탭**: 주요 ETF 15개 (KRW/USD 토글, 기본값 원화, 한글 설명 표시)
-  - **그룹 필터**: 그룹 탭 클릭으로 필터링, 드래그&드롭으로 순서 변경 (localStorage 저장)
+  - **소유자 필터**: 상단 소유자 버튼으로 필터링, 소유자 추가(인라인 입력) / 삭제
+  - **그룹 필터**: 그룹 탭 클릭으로 필터링, 드래그&드롭으로 순서 변경 (localStorage 저장, 소유자별 순서 독립 저장)
   - **그룹 관리**: 그룹 추가(인라인 입력) / 삭제 / 이름 변경
-  - **중복 등록**: 같은 종목을 여러 그룹에 등록 가능 (복합키 `symbol|group`)
+  - **중복 등록**: 같은 종목을 여러 소유자·그룹에 등록 가능 (복합키 `symbol|owner|group`)
   - **전체 탭**: 중복 종목은 1건만 표시, 소속 그룹을 뱃지로 모두 표시
   - **마우스 그룹 선택**: 관심추가 시 드롭다운 팝업에서 그룹 선택
   - **빈 그룹 유지**: 종목이 없어도 그룹이 삭제되지 않음 (localStorage 영속)
@@ -131,9 +133,9 @@ http://localhost:8080
 | PUT | `/api/stock/news-keywords` | 뉴스 필터 키워드 업데이트 (서버 영속화) |
 | GET | `/api/stock/watchlist` | 관심 종목 목록 조회 |
 | POST | `/api/stock/watchlist` | 관심 종목 추가 (`group` 필드 필수) |
-| DELETE | `/api/stock/watchlist/{symbol\|group}` | 관심 종목 삭제 (composite key 또는 symbol) |
+| DELETE | `/api/stock/watchlist/{symbol\|owner\|group}` | 관심 종목 삭제 (composite key 또는 symbol) |
 | GET | `/api/stock/watchlist/groups` | 그룹 목록 조회 |
-| PUT | `/api/stock/watchlist/{symbol\|group}/group` | 그룹 이동 |
+| PUT | `/api/stock/watchlist/{symbol\|owner\|group}/group` | 그룹 이동 |
 | DELETE | `/api/stock/watchlist/groups/{groupName}` | 그룹 삭제 (소속 종목도 삭제) |
 | PUT | `/api/stock/watchlist/groups/{groupName}` | 그룹 이름 변경 |
 | PUT | `/api/stock/watchlist/{symbol}/portfolio` | 보유수량/평균단가 업데이트 (`quantity`, `purchasePrice`) |
@@ -184,7 +186,7 @@ PUT /api/stock/news-keywords
 
 - 서버 재시작 시 파일에서 자동 로드하여 복원
 - 최대 100개까지 등록 가능, 4~12자 영숫자 종목 코드 형식 검증 적용
-- 같은 종목을 다른 그룹에 중복 등록 가능 (복합키: `symbol|group`)
+- 같은 종목을 다른 소유자·그룹에 중복 등록 가능 (복합키: `symbol|owner|group`, owner 기본값 '나')
 - "전체" 탭에서는 symbol 기준 중복 제거하여 1건만 표시
 - 그룹 삭제 시 소속 종목도 함께 삭제
 - 종목별 `quantity`(보유수량), `purchasePrice`(평균단가) 저장 — 포트폴리오 수익률 계산에 활용

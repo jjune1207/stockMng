@@ -16,9 +16,15 @@ public interface WatchlistService {
 
     List<WatchlistItemDto> moveToGroup(String symbol, String group);
 
-    List<WatchlistItemDto> deleteGroup(String groupName);
+    List<WatchlistItemDto> deleteGroup(String ownerName, String groupName);
 
-    List<WatchlistItemDto> renameGroup(String oldName, String newName);
+    List<WatchlistItemDto> renameGroup(String ownerName, String oldName, String newName);
 
     List<WatchlistItemDto> updatePortfolio(String symbolOrKey, Double quantity, Double purchasePrice);
+
+    List<String> getOwners();
+
+    List<WatchlistItemDto> renameOwner(String oldName, String newName);
+
+    List<WatchlistItemDto> deleteOwner(String ownerName);
 }

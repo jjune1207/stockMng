@@ -170,6 +170,7 @@ public class StockApiController {
             .market(request.getMarket())
             .type(request.getType())
             .group(request.getGroup())
+            .owner(request.getOwner())
             .build();
 
         return ResponseEntity.ok(stockDataFacade.addWatchlistItem(item));
@@ -193,15 +194,35 @@ public class StockApiController {
     }
 
     @DeleteMapping("/watchlist/groups/{groupName}")
-    public ResponseEntity<List<WatchlistItemDto>> deleteGroup(@PathVariable("groupName") String groupName) {
-        return ResponseEntity.ok(stockDataFacade.deleteWatchlistGroup(groupName));
+    public ResponseEntity<List<WatchlistItemDto>> deleteGroup(
+        @PathVariable("groupName") String groupName,
+        @RequestParam(name = "owner", defaultValue = "") String owner) {
+        return ResponseEntity.ok(stockDataFacade.deleteWatchlistGroup(owner, groupName));
     }
 
     @PutMapping("/watchlist/groups/{groupName}")
     public ResponseEntity<List<WatchlistItemDto>> renameGroup(
         @PathVariable("groupName") String groupName,
         @RequestBody Map<String, String> body) {
-        return ResponseEntity.ok(stockDataFacade.renameWatchlistGroup(groupName, body.get("newName")));
+        return ResponseEntity.ok(stockDataFacade.renameWatchlistGroup(
+            body.getOrDefault("owner", ""), groupName, body.get("newName")));
+    }
+
+    @GetMapping("/watchlist/owners")
+    public ResponseEntity<List<String>> getOwners() {
+        return ResponseEntity.ok(stockDataFacade.getOwners());
+    }
+
+    @PutMapping("/watchlist/owners/{ownerName}")
+    public ResponseEntity<List<WatchlistItemDto>> renameOwner(
+        @PathVariable("ownerName") String ownerName,
+        @RequestBody Map<String, String> body) {
+        return ResponseEntity.ok(stockDataFacade.renameOwner(ownerName, body.get("newName")));
+    }
+
+    @DeleteMapping("/watchlist/owners/{ownerName}")
+    public ResponseEntity<List<WatchlistItemDto>> deleteOwner(@PathVariable("ownerName") String ownerName) {
+        return ResponseEntity.ok(stockDataFacade.deleteOwner(ownerName));
     }
 
     @PutMapping("/watchlist/{symbol}/portfolio")

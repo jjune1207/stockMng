@@ -79,6 +79,10 @@ public class NaverStockServiceImpl implements NaverStockService {
         "(KODEX|TIGER|KOSEF|ARIRANG|ACE|RISE|SOL|HANARO|KBSTAR|ETF|ETN|INVERS|LEVERAGE|FUTURE|S&P|NASDAQ|TOP10)",
         Pattern.CASE_INSENSITIVE
     );
+    private static final Pattern SEARCH_LIST_ITEM_PATTERN = Pattern.compile(
+        "/item/main\\.naver\\?code=([A-Z0-9]{6})[^>]*>\\s*([^<]+?)\\s*</a>",
+        Pattern.CASE_INSENSITIVE
+    );
 
     /** siseJson 응답 행 패턴: ["20230102", 55500, 56100, 55200, 55500, 10031448, 49.67] */
     private static final Pattern ROW_PATTERN = Pattern.compile(
@@ -349,6 +353,15 @@ public class NaverStockServiceImpl implements NaverStockService {
 
         log.info("종목 검색 요청: keyword={}", keyword);
 
+        List<StockSearchDto> results = searchWithAutoComplete(keyword);
+        if (results.isEmpty()) {
+            log.info("자동완성 결과 없음, 검색 페이지 폴백: keyword={}", keyword);
+            results = searchWithFinancePage(keyword);
+        }
+        return results;
+    }
+
+    private List<StockSearchDto> searchWithAutoComplete(String keyword) {
         try {
             String response = naverWebClient.get()
                 .uri(uriBuilder -> uriBuilder
@@ -365,13 +378,56 @@ public class NaverStockServiceImpl implements NaverStockService {
             if (response == null || response.isBlank()) {
                 return Collections.emptyList();
             }
-
             return parseSearchResponse(response);
-
         } catch (Exception e) {
-            log.error("검색 API 호출 실패: keyword={}, {}", keyword, e.getMessage());
+            log.error("자동완성 API 호출 실패: keyword={}, {}", keyword, e.getMessage());
             return Collections.emptyList();
         }
+    }
+
+    private List<StockSearchDto> searchWithFinancePage(String keyword) {
+        try {
+            byte[] responseBytes = naverWebClient.get()
+                .uri(uriBuilder -> uriBuilder
+                    .scheme("https")
+                    .host("finance.naver.com")
+                    .path("/search/searchList.naver")
+                    .queryParam("query", keyword)
+                    .build())
+                .retrieve()
+                .bodyToMono(byte[].class)
+                .block();
+
+            String html = decodeEucKr(responseBytes);
+            return parseSearchListPage(html);
+        } catch (Exception e) {
+            log.error("검색 페이지 폴백 실패: keyword={}, {}", keyword, e.getMessage());
+            return Collections.emptyList();
+        }
+    }
+
+    private List<StockSearchDto> parseSearchListPage(String html) {
+        if (html == null || html.isBlank()) {
+            return Collections.emptyList();
+        }
+
+        Map<String, StockSearchDto> deduped = new LinkedHashMap<>();
+        Matcher matcher = SEARCH_LIST_ITEM_PATTERN.matcher(html);
+        while (matcher.find()) {
+            String code = matcher.group(1);
+            String name = stripHtml(matcher.group(2)).trim();
+            if (code.isBlank() || name.isBlank() || deduped.containsKey(code)) {
+                continue;
+            }
+            boolean isEtf = ETF_NAME_PATTERN.matcher(name).find();
+            deduped.put(code, StockSearchDto.builder()
+                .symbol(code)
+                .name(name)
+                .market("KRX")
+                .type(isEtf ? "etf" : "stock")
+                .build());
+        }
+        return new ArrayList<>(deduped.values());
     }
 
     @Override

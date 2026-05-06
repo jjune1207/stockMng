@@ -20,6 +20,9 @@ public class WatchlistItemDto {
 
     private String group;
 
+    @Builder.Default
+    private String owner = "나";
+
     /** 보유수량 */
     private Double quantity;
 

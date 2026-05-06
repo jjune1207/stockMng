@@ -32,7 +32,7 @@ gradlew.bat test
 - **Controller**: REST API 엔드포인트(`/api/stock/**`) + Thymeleaf 뷰 라우팅
 - **StockDataFacade**: 모든 서비스 호출을 하나로 묶는 퍼사드 패턴. Controller는 이 퍼사드만 의존. 뉴스 키워드 미지정 시 `newsKeywordsService` 저장 키워드 자동 적용, trim·deduplicate 정규화 후 전달
 - **NaverStockServiceImpl**: 네이버 증권 API(시세, 검색, 분봉/일봉, 시장 지표)를 WebClient로 호출. 해외 종목(6자리 숫자 아닌 심볼)은 Yahoo Finance로 라우팅(`yahooWebClient` Bean 별도 분리). `INDEX_YAHOO_SYMBOLS` 맵으로 대표지수 ID → Yahoo 심볼 변환. `US_ETF_DESCRIPTIONS` 맵으로 미국 ETF 한글 설명. `getDomesticPopular`: 국내 주식(코스피 시총 상위 10)/ETF(인기 16종) 고정 리스트 반환. Caffeine 캐시 적용
-- **InMemoryWatchlistService**: 관심 종목을 인메모리로 관리하고 `data/watchlist.json`에 JSON 영속화. 복합키(`symbol|group`) 기반 그룹별 분류. 서버 시작 시 `type` 필드 누락 항목 자동 마이그레이션. `synchronized(watchlistLock)` + 원자적 파일 쓰기(tempFile→ATOMIC_MOVE). 테스트용 생성자 주입 지원
+- **InMemoryWatchlistService**: 관심 종목을 인메모리로 관리하고 `data/watchlist.json`에 JSON 영속화. 복합키(`symbol|owner|group`) 기반 소유자·그룹별 분류(owner 기본값 '나'). 레거시 2파트 키(`symbol|group`) 자동 변환 지원. `synchronized(watchlistLock)` + 원자적 파일 쓰기(tempFile→ATOMIC_MOVE). 테스트용 생성자 주입 지원
 - **InMemoryNewsKeywordsService**: 뉴스 필터 키워드를 `data/news-keywords.json`에 영속화. `@PostConstruct`로 로드, `synchronized(keywordsLock)` + 원자적 파일 쓰기. `NewsKeywordsService` 인터페이스를 통해 Facade에서 호출
 - **IndicatorUtil**: 기술적 지표 계산 유틸리티 (MA, 볼린저밴드, RSI, MACD). Controller에서 캔들 응답에 지표를 합성할 때 직접 호출
 
@@ -56,4 +56,4 @@ gradlew.bat test
 
 ## API 경로 규칙
 
-모든 REST API는 `/api/stock` 하위. 캔들: `/{symbol}/candle?timeframe=1|3|10|day`. 시장 지표: `/market-indicators` (코스피→코스닥→S&P500→나스닥→다우→환율→WTI→금→은). 환율: `/usdkrw-rate`. 뉴스: `/news?limit=N&keywords=k1,k2` (기본값·최대 10). 뉴스 키워드: `GET /news-keywords`, `PUT /news-keywords`. 인기 종목: `/top?type=stock|etf|us_stock|us_etf&limit=1~20` (국내 고정 인기 목록, 미국 실시간). 관심 종목 삭제: 복합키(`symbol|group`) 또는 symbol 단독. 포트폴리오 업데이트: `PUT /watchlist/{symbol}/portfolio` (quantity, purchasePrice). 대표지수(KOSPI/KOSDAQ/SP500/NASDAQ/DJI) 클릭 시 `/chart/{id}` 이동 (WTI/USDKRW는 클릭 없음).
+모든 REST API는 `/api/stock` 하위. 캔들: `/{symbol}/candle?timeframe=1|3|10|day`. 시장 지표: `/market-indicators` (코스피→코스닥→S&P500→나스닥→다우→환율→WTI→금→은). 환율: `/usdkrw-rate`. 뉴스: `/news?limit=N&keywords=k1,k2` (기본값·최대 10). 뉴스 키워드: `GET /news-keywords`, `PUT /news-keywords`. 인기 종목: `/top?type=stock|etf|us_stock|us_etf&limit=1~20` (국내 고정 인기 목록, 미국 실시간). 관심 종목 삭제: 복합키(`symbol|owner|group`) 또는 symbol 단독. 포트폴리오 업데이트: `PUT /watchlist/{symbol}/portfolio` (quantity, purchasePrice). 그룹 이동: `PUT /watchlist/{symbol|owner|group}/group`. 대표지수(KOSPI/KOSDAQ/SP500/NASDAQ/DJI) 클릭 시 `/chart/{id}` 이동 (WTI/USDKRW는 클릭 없음).

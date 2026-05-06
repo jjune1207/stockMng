@@ -114,7 +114,7 @@ class InMemoryWatchlistServiceTest {
             .group("보관")
             .build());
 
-        List<WatchlistItemDto> result = service.deleteGroup("테스트");
+        List<WatchlistItemDto> result = service.deleteGroup("나", "테스트");
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getSymbol()).isEqualTo("000660");
     }
@@ -128,7 +128,7 @@ class InMemoryWatchlistServiceTest {
             .group("구이름")
             .build());
 
-        List<WatchlistItemDto> result = service.renameGroup("구이름", "새이름");
+        List<WatchlistItemDto> result = service.renameGroup("나", "구이름", "새이름");
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getGroup()).isEqualTo("새이름");
     }

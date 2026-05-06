@@ -14,4 +14,5 @@ public class WatchlistRequestDto {
     private String market;
     private String type;
     private String group;
+    private String owner;
 }

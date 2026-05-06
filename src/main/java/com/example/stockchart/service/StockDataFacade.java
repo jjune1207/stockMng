@@ -93,15 +93,27 @@ public class StockDataFacade {
         return watchlistService.moveToGroup(symbol, group);
     }
 
-    public List<WatchlistItemDto> deleteWatchlistGroup(String groupName) {
-        return watchlistService.deleteGroup(groupName);
+    public List<WatchlistItemDto> deleteWatchlistGroup(String ownerName, String groupName) {
+        return watchlistService.deleteGroup(ownerName, groupName);
     }
 
-    public List<WatchlistItemDto> renameWatchlistGroup(String oldName, String newName) {
-        return watchlistService.renameGroup(oldName, newName);
+    public List<WatchlistItemDto> renameWatchlistGroup(String ownerName, String oldName, String newName) {
+        return watchlistService.renameGroup(ownerName, oldName, newName);
     }
 
     public List<WatchlistItemDto> updateWatchlistPortfolio(String symbolOrKey, Double quantity, Double purchasePrice) {
         return watchlistService.updatePortfolio(symbolOrKey, quantity, purchasePrice);
+    }
+
+    public List<String> getOwners() {
+        return watchlistService.getOwners();
+    }
+
+    public List<WatchlistItemDto> renameOwner(String oldName, String newName) {
+        return watchlistService.renameOwner(oldName, newName);
+    }
+
+    public List<WatchlistItemDto> deleteOwner(String ownerName) {
+        return watchlistService.deleteOwner(ownerName);
     }
 }
