@@ -103,6 +103,14 @@
                 <div class="skeleton-line short"></div>
                 <div class="skeleton-line long"></div>
             </div>
+            <div class="market-indicator-card skeleton">
+                <div class="skeleton-line short"></div>
+                <div class="skeleton-line long"></div>
+            </div>
+            <div class="market-indicator-card skeleton">
+                <div class="skeleton-line short"></div>
+                <div class="skeleton-line long"></div>
+            </div>
         </div>
     </div>
 
@@ -528,7 +536,7 @@
             const krw = usdKrwRate > 0 ? Math.round(value / OZ_PER_DON * usdKrwRate) : 0;
             return krw > 0 ? krw.toLocaleString('ko-KR') + '원' : '-';
         }
-        if (id === 'WTI' || id === 'SP500' || id === 'NASDAQ' || id === 'DJI') {
+        if (id === 'WTI' || id === 'SP500' || id === 'NASDAQ' || id === 'DJI' || id === 'SOX' || id === 'VIX') {
             return value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
         return value.toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -610,14 +618,14 @@
     }
 
     // 차트 상세 페이지로 이동하는 대표 지수 ID 목록
-    const CHART_INDICATOR_IDS = new Set(['KOSPI', 'KOSDAQ', 'SP500', 'NASDAQ', 'DJI']);
+    const CHART_INDICATOR_IDS = new Set(['KOSPI', 'KOSDAQ', 'SP500', 'NASDAQ', 'DJI', 'SOX', 'VIX']);
     // 스파크라인(미니 차트)을 표시할 지수 ID 목록 — 코스피/코스닥만
     const SPARK_INDICATOR_IDS = new Set(['KOSPI', 'KOSDAQ']);
 
     function renderMarketIndicators(indicators) {
         const container = document.getElementById('marketIndicatorList');
 
-        container.innerHTML = indicators.map(ind => {
+        function buildRowHtml(ind) {
             const isGoldSilver = ind.id === 'GOLD' || ind.id === 'SILVER';
             const isPositive = ind.changeRate >= 0;
             const changeSign = isPositive ? '+' : '';
@@ -637,7 +645,42 @@
             const rateStr = ind.changeRate !== 0
                 ? `${changeSign}${Math.abs(ind.changeRate).toFixed(2)}%`
                 : '0.00%';
+            return { displayName, valueStr, changeStr, rateStr, arrow, changeClass };
+        }
 
+        const COMBO_IDS = new Set(['GOLD', 'SILVER', 'WTI', 'USDKRW']);
+        const goldInd   = indicators.find(i => i.id === 'GOLD');
+        const silverInd = indicators.find(i => i.id === 'SILVER');
+        const wtiInd    = indicators.find(i => i.id === 'WTI');
+        const usdkrwInd = indicators.find(i => i.id === 'USDKRW');
+        const others    = indicators.filter(i => !COMBO_IDS.has(i.id));
+
+        function buildComboCard(topInd, botInd) {
+            const t = buildRowHtml(topInd);
+            const b = buildRowHtml(botInd);
+            return `<div class="market-indicator-card market-indicator-card--combo">
+                <div class="combo-row">
+                    <div class="indicator-top">
+                        <span class="indicator-name">${t.displayName}</span>
+                        <span class="indicator-rate ${t.changeClass}">${t.arrow} ${t.rateStr}</span>
+                    </div>
+                    <div class="indicator-value" style="font-size:0.85em">${t.valueStr}</div>
+                    <div class="indicator-change ${t.changeClass}" style="font-size:0.75em">${t.changeStr}</div>
+                </div>
+                <div class="combo-divider"></div>
+                <div class="combo-row">
+                    <div class="indicator-top">
+                        <span class="indicator-name">${b.displayName}</span>
+                        <span class="indicator-rate ${b.changeClass}">${b.arrow} ${b.rateStr}</span>
+                    </div>
+                    <div class="indicator-value" style="font-size:0.85em">${b.valueStr}</div>
+                    <div class="indicator-change ${b.changeClass}" style="font-size:0.75em">${b.changeStr}</div>
+                </div>
+            </div>`;
+        }
+
+        let html = others.map(ind => {
+            const { displayName, valueStr, changeStr, rateStr, arrow, changeClass } = buildRowHtml(ind);
             const isChartable = CHART_INDICATOR_IDS.has(ind.id);
             const hasSpark = SPARK_INDICATOR_IDS.has(ind.id);
             const clickable = isChartable ? ' clickable' : '';
@@ -645,7 +688,6 @@
             const sparkCanvas = hasSpark
                 ? `<canvas class="indicator-spark" data-id="${ind.id}" width="150" height="36"></canvas>`
                 : '';
-
             return `<div class="market-indicator-card${clickable}" data-id="${ind.id}"${onclick}>
                 <div class="indicator-top">
                     <span class="indicator-name">${displayName}</span>
@@ -656,6 +698,11 @@
                 ${sparkCanvas}
             </div>`;
         }).join('');
+
+        if (wtiInd && usdkrwInd) html += buildComboCard(wtiInd, usdkrwInd);
+        if (goldInd && silverInd)  html += buildComboCard(goldInd, silverInd);
+
+        container.innerHTML = html;
 
         // 코스피/코스닥만 스파크라인 그리기
         indicators.filter(ind => SPARK_INDICATOR_IDS.has(ind.id)).forEach(ind => {
@@ -722,7 +769,7 @@
             indicatorBar.classList.toggle('border-secondary', isDark);
             indicatorBar.classList.toggle('border-light-subtle', !isDark);
         }
-        // 뉴스 스크롤 래퍼 테마 전환
+        // 뉴스 스크롤 래퍼 테마
         const newsWrap = document.getElementById('usNewsScrollWrap');
         if (newsWrap) {
             newsWrap.classList.toggle('border-secondary', isDark);
@@ -765,6 +812,7 @@
     (function() { applyTheme(getStoredTheme()); })();
 
     const PREFERRED_GROUP_ORDER = ['ISA', '국내주식', '연금저축', '미국주식'];
+    
     const OWNER_GROUP_ORDERS_KEY = 'ownerGroupOrders';
 
     function loadGroupOrder(ownerName) {
@@ -1576,11 +1624,13 @@
     }
 
     const ETF_NAME_RE = /KODEX|TIGER|KOSEF|ARIRANG|ACE|RISE|SOL|HANARO|KBSTAR|ETF|ETN/i;
+    const US_ETF_NAME_RE = /ETF|Trust|Fund|ProShares|iShares|Vanguard|Invesco|Schwab|SPDR|Direxion|WisdomTree|Amplify|JPMorgan.*Income/i;
 
     function buildTypeBadge(item, price) {
         const isUs = price ? (price.currency === 'USD') : /^[A-Za-z]/.test(item.symbol);
         const displayName = (price ? price.name : null) || item.name || '';
-        const isEtf = item.type === 'etf' || ETF_NAME_RE.test(displayName);
+        const isEtf = item.type === 'etf' || item.type === 'us_etf' || ETF_NAME_RE.test(displayName)
+            || (isUs && US_ETF_NAME_RE.test(displayName));
         if (isUs && isEtf) return '<span class="badge bg-warning text-dark">US ETF</span>';
         if (isUs)          return '<span class="badge bg-success">US 주식</span>';
         if (isEtf)         return '<span class="badge bg-info">ETF</span>';
@@ -1727,7 +1777,8 @@
         const symbol = escHtml(item.symbol);
         const name = escHtml(item.name || item.symbol);
         const market = escHtml(item.market || '');
-        const type = escHtml(item.type === 'etf' ? 'etf' : 'stock');
+        const validTypes = ['etf', 'stock', 'us_etf', 'us_stock'];
+        const type = escHtml(validTypes.includes(item.type) ? item.type : 'stock');
 
         return '<button class="btn btn-sm btn-outline-success" data-action="add-watch" ' +
             'data-symbol="' + symbol + '" data-name="' + name + '" data-market="' + market + '" data-type="' + type + '">' +
@@ -1932,7 +1983,8 @@
             const badge = item.type === 'etf'
                 ? '<span class="badge bg-info ms-1 small">ETF</span>'
                 : '<span class="badge bg-secondary ms-1 small">' + escHtml(item.market || '') + '</span>';
-            const watchBtn = '<button class="btn btn-sm btn-outline-success" data-action="add-watch" data-symbol="' + escHtml(item.symbol) + '" data-name="' + escHtml(item.name) + '" data-market="' + escHtml(item.market || '') + '" data-type="' + escHtml(item.type === 'etf' ? 'etf' : 'stock') + '">관심추가</button>';
+            const validTypes = ['etf', 'stock', 'us_etf', 'us_stock'];
+            const watchBtn = '<button class="btn btn-sm btn-outline-success" data-action="add-watch" data-symbol="' + escHtml(item.symbol) + '" data-name="' + escHtml(item.name) + '" data-market="' + escHtml(item.market || '') + '" data-type="' + escHtml(validTypes.includes(item.type) ? item.type : 'stock') + '">관심추가</button>';
 
             return '<div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom border-secondary">' +
                 '<a href="/chart/' + escHtml(item.symbol) + '" class="text-body text-decoration-none">' +

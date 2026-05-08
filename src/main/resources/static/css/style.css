@@ -302,6 +302,30 @@ body {
     margin-top: 4px;
 }
 
+/* 금+은 콤보 카드 */
+.market-indicator-card--combo {
+    padding: 0;
+    justify-content: stretch;
+}
+
+.combo-row {
+    padding: 6px 12px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.combo-row .indicator-top {
+    margin-bottom: 2px;
+}
+
+.combo-divider {
+    height: 1px;
+    background: rgba(255, 255, 255, 0.1);
+    margin: 0 8px;
+}
+
 /* 스켈레톤 로딩 */
 .market-indicator-card.skeleton {
     animation: skeleton-pulse 1.5s ease-in-out infinite;
@@ -358,6 +382,10 @@ body {
 
 [data-bs-theme="light"] .market-indicator-card {
     border-right-color: rgba(0, 0, 0, 0.08);
+}
+
+[data-bs-theme="light"] .combo-divider {
+    background: rgba(0, 0, 0, 0.1);
 }
 
 .watchlist-group-tag {

@@ -117,7 +117,9 @@ public class NaverStockServiceImpl implements NaverStockService {
         "KOSDAQ", "^KQ11",
         "SP500",  "^GSPC",
         "NASDAQ", "^IXIC",
-        "DJI",    "^DJI"
+        "DJI",    "^DJI",
+        "SOX",    "^SOX",
+        "VIX",    "^VIX"
     );
 
     private String resolveYahooSymbol(String symbol) {
@@ -567,8 +569,10 @@ public class NaverStockServiceImpl implements NaverStockService {
         result.add(fetchNaverForeignIndexIndicator(".INX", "SP500", "S&P 500", "^GSPC"));
         result.add(fetchNaverForeignIndexIndicator(".IXIC", "NASDAQ", "나스닥", "^IXIC"));
         result.add(fetchNaverForeignIndexIndicator(".DJI", "DJI", "다우지수", "^DJI"));
-        result.add(fetchNaverMarketIndexIndicator("exchange", "FX_USDKRW", "USDKRW", "환율 (USD/KRW)"));
+        result.add(fetchYahooCommodityIndicator("^SOX", "SOX", "필라델피아 반도체"));
+        result.add(fetchYahooCommodityIndicator("^VIX", "VIX", "VIX 공포지수"));
         result.add(fetchNaverMarketIndexIndicator("energy", "CLcv1", "WTI", "WTI 유가"));
+        result.add(fetchNaverMarketIndexIndicator("exchange", "FX_USDKRW", "USDKRW", "환율"));
         result.add(fetchYahooCommodityIndicator("GC=F", "GOLD", "금 (Gold)"));
         result.add(fetchYahooCommodityIndicator("SI=F", "SILVER", "은 (Silver)"));
 
