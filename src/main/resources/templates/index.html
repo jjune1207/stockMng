@@ -181,81 +181,70 @@
         </div>
     </div>
 
-    <!-- 관심 종목 등락률 알림 패널 (±5%) -->
-    <div class="price-alert-panel" id="priceAlertPanel">
-        <div class="price-alert-header">
-            <span class="price-alert-title">
-                <i class="bi bi-bell-fill" style="color:#f0a500;font-size:0.78rem"></i>
-                관심 종목 급등락 알림
-                <span id="priceAlertCount" class="badge" style="background:rgba(240,165,0,0.2);color:#f0a500;font-size:0.62rem;font-weight:600"></span>
-            </span>
-            <button class="price-alert-dismiss" id="priceAlertDismiss" onclick="dismissPriceAlert()" title="닫기">✕</button>
-        </div>
-        <div class="price-alert-chips" id="priceAlertChips"></div>
+    <div class="tab-and-alert-wrapper mb-3">
+        <ul class="nav nav-tabs border-secondary" id="stockTab" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button
+                    class="nav-link active"
+                    id="watchlist-tab"
+                    data-bs-toggle="tab"
+                    data-bs-target="#watchlistPanel"
+                    type="button"
+                    role="tab"
+                >
+                    <i class="bi bi-bookmark-star me-1"></i>관심 종목
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button
+                    class="nav-link"
+                    id="stock-tab"
+                    data-bs-toggle="tab"
+                    data-bs-target="#stockPanel"
+                    type="button"
+                    role="tab"
+                >
+                    <i class="bi bi-graph-up me-1"></i>국내 주식
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button
+                    class="nav-link"
+                    id="etf-tab"
+                    data-bs-toggle="tab"
+                    data-bs-target="#etfPanel"
+                    type="button"
+                    role="tab"
+                >
+                    <i class="bi bi-collection me-1"></i>국내 ETF
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button
+                    class="nav-link"
+                    id="us-stock-tab"
+                    data-bs-toggle="tab"
+                    data-bs-target="#usStockPanel"
+                    type="button"
+                    role="tab"
+                >
+                    <i class="bi bi-globe-americas me-1"></i>미국 주식
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button
+                    class="nav-link"
+                    id="us-etf-tab"
+                    data-bs-toggle="tab"
+                    data-bs-target="#usEtfPanel"
+                    type="button"
+                    role="tab"
+                >
+                    <i class="bi bi-collection-fill me-1"></i>미국 ETF
+                </button>
+            </li>
+        </ul>
     </div>
-
-    <ul class="nav nav-tabs border-secondary mb-3" id="stockTab" role="tablist">
-        <li class="nav-item" role="presentation">
-            <button
-                class="nav-link active"
-                id="watchlist-tab"
-                data-bs-toggle="tab"
-                data-bs-target="#watchlistPanel"
-                type="button"
-                role="tab"
-            >
-                <i class="bi bi-bookmark-star me-1"></i>관심 종목
-            </button>
-        </li>
-        <li class="nav-item" role="presentation">
-            <button
-                class="nav-link"
-                id="stock-tab"
-                data-bs-toggle="tab"
-                data-bs-target="#stockPanel"
-                type="button"
-                role="tab"
-            >
-                <i class="bi bi-graph-up me-1"></i>국내 주식
-            </button>
-        </li>
-        <li class="nav-item" role="presentation">
-            <button
-                class="nav-link"
-                id="etf-tab"
-                data-bs-toggle="tab"
-                data-bs-target="#etfPanel"
-                type="button"
-                role="tab"
-            >
-                <i class="bi bi-collection me-1"></i>국내 ETF
-            </button>
-        </li>
-        <li class="nav-item" role="presentation">
-            <button
-                class="nav-link"
-                id="us-stock-tab"
-                data-bs-toggle="tab"
-                data-bs-target="#usStockPanel"
-                type="button"
-                role="tab"
-            >
-                <i class="bi bi-globe-americas me-1"></i>미국 주식
-            </button>
-        </li>
-        <li class="nav-item" role="presentation">
-            <button
-                class="nav-link"
-                id="us-etf-tab"
-                data-bs-toggle="tab"
-                data-bs-target="#usEtfPanel"
-                type="button"
-                role="tab"
-            >
-                <i class="bi bi-collection-fill me-1"></i>미국 ETF
-            </button>
-        </li>
-    </ul>
 
     <div class="tab-content">
         <div class="tab-pane fade" id="stockPanel" role="tabpanel">
@@ -412,6 +401,17 @@
                                 <button class="btn btn-warning watchlist-currency-btn active" data-cur="KRW">₩ 원화</button>
                                 <button class="btn btn-outline-warning watchlist-currency-btn" data-cur="USD">$ USD</button>
                             </div>
+                        </div>
+                        <!-- 관심 종목 급등락 알림 패널 -->
+                        <div class="price-alert-panel" id="priceAlertPanel">
+                            <div class="price-alert-header">
+                                <span class="price-alert-title">
+                                    <i class="bi bi-bell-fill" style="color:#f0a500;font-size:0.78rem"></i>
+                                    관심 종목 급등락 알림
+                                    <span id="priceAlertCount" class="badge" style="background:rgba(240,165,0,0.2);color:#f0a500;font-size:0.62rem;font-weight:600"></span>
+                                </span>
+                            </div>
+                            <div class="price-alert-chips" id="priceAlertChips"></div>
                         </div>
                         <div class="d-flex align-items-center gap-2">
                             <small class="text-secondary" id="watchlistUpdated"></small>
@@ -710,16 +710,11 @@
             </div>`;
         }
 
-        function rateCls(r) { return r >= 1.0 ? 'safe' : r >= 0 ? 'caution' : r >= -1.0 ? 'warning' : 'danger'; }
-        function rateArrow(r) { return r > 0 ? '▲' : r < 0 ? '▼' : '—'; }
-        function rateSign(r)  { return r >= 0 ? '+' : ''; }
-
-        function buildGroupStrip(label, badgesHtml, comment) {
+        function buildGroupStrip(label, comment) {
             const escaped = comment.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
             return `<div class="group-outlook-strip" data-comment="${escaped}">
                 <span class="outlook-label"><i class="bi bi-eye-fill"></i> ${label}</span>
                 <span class="outlook-divider">|</span>
-                ${badgesHtml}
                 <span class="outlook-comment-wrap"><span class="outlook-comment">${comment}</span></span>
             </div>`;
         }
@@ -741,12 +736,8 @@
                 [-1.0,      'warning', '국내 소폭 약세', '국내 증시 소폭 하락 → 단기 조정 구간. 방어적 포지션 검토.'],
                 [-Infinity, 'danger',  '국내 약세',     '코스피·코스닥 동반 하락 → 약세. 신규 매수 자제, 손절 기준 재점검 권고.'],
             ];
-            const [, lCls, lLabel, lComment] = KOREA.find(([t]) => avg >= t);
-            const badges =
-                `<span class="outlook-badge ${lCls} me-1">${lLabel}</span>` +
-                `<span class="outlook-badge ${rateCls(kospiInd.changeRate)} me-1">KOSPI ${rateArrow(kospiInd.changeRate)} ${rateSign(kospiInd.changeRate)}${kospiInd.changeRate.toFixed(2)}%</span>` +
-                `<span class="outlook-badge ${rateCls(kosdaqInd.changeRate)} me-1">KOSDAQ ${rateArrow(kosdaqInd.changeRate)} ${rateSign(kosdaqInd.changeRate)}${kosdaqInd.changeRate.toFixed(2)}%</span>`;
-            group1Html = buildGroup([kospiInd, kosdaqInd], 2, buildGroupStrip('국내 증시', badges, lComment));
+            const [,, , lComment] = KOREA.find(([t]) => avg >= t);
+            group1Html = buildGroup([kospiInd, kosdaqInd], 2, buildGroupStrip('국내 증시', lComment));
         }
 
         // 미국 증시 그룹 (SP500 + NASDAQ + DJI)
@@ -763,13 +754,8 @@
                 [-1.0,      'warning', '미국 소폭 약세', '미 증시 소폭 하락 → 단기 조정. 나스닥 변동성 확인 후 대응 권장.'],
                 [-Infinity, 'danger',  '미국 약세',     '미 3대 지수 동반 하락 → 리스크 오프. 방어주·현금 비중 확대 고려.'],
             ];
-            const [, lCls, lLabel, lComment] = US.find(([t]) => avg >= t);
-            const badges =
-                `<span class="outlook-badge ${lCls} me-1">${lLabel}</span>` +
-                `<span class="outlook-badge ${rateCls(sp500Ind.changeRate)} me-1">S&P ${rateArrow(sp500Ind.changeRate)} ${rateSign(sp500Ind.changeRate)}${sp500Ind.changeRate.toFixed(2)}%</span>` +
-                `<span class="outlook-badge ${rateCls(nasdaqInd.changeRate)} me-1">NASDAQ ${rateArrow(nasdaqInd.changeRate)} ${rateSign(nasdaqInd.changeRate)}${nasdaqInd.changeRate.toFixed(2)}%</span>` +
-                `<span class="outlook-badge ${rateCls(djiInd.changeRate)} me-1">DOW ${rateArrow(djiInd.changeRate)} ${rateSign(djiInd.changeRate)}${djiInd.changeRate.toFixed(2)}%</span>`;
-            group2Html = buildGroup([sp500Ind, nasdaqInd, djiInd], 3, buildGroupStrip('미국 증시', badges, lComment));
+            const [,, , lComment] = US.find(([t]) => avg >= t);
+            group2Html = buildGroup([sp500Ind, nasdaqInd, djiInd], 3, buildGroupStrip('미국 증시', lComment));
         }
 
         // 리스크/기술주 그룹 (SOX + VIX)
@@ -779,15 +765,12 @@
         if (vixInd && soxInd) {
             const vix = vixInd.currentValue;
             const soxRate = soxInd.changeRate;
-            let vixLevel, vixCls, vixLabel;
-            if (vix < 15)      { vixLevel = 0; vixCls = 'safe';    vixLabel = `VIX ${vix.toFixed(1)} 안정`; }
-            else if (vix < 20) { vixLevel = 1; vixCls = 'caution'; vixLabel = `VIX ${vix.toFixed(1)} 보통`; }
-            else if (vix < 30) { vixLevel = 2; vixCls = 'warning'; vixLabel = `VIX ${vix.toFixed(1)} 높음`; }
-            else               { vixLevel = 3; vixCls = 'danger';  vixLabel = `VIX ${vix.toFixed(1)} 극도공포`; }
+            let vixLevel;
+            if (vix < 15)      { vixLevel = 0; }
+            else if (vix < 20) { vixLevel = 1; }
+            else if (vix < 30) { vixLevel = 2; }
+            else               { vixLevel = 3; }
             const soxLevel = soxRate >= 1.0 ? 1 : soxRate <= -1.0 ? -1 : 0;
-            const soxCls   = soxRate >= 1.0 ? 'safe' : soxRate <= -1.0 ? 'danger' : 'caution';
-            const soxArrow = soxRate > 0 ? '▲' : soxRate < 0 ? '▼' : '—';
-            const soxLabel = `SOX ${soxArrow} ${rateSign(soxRate)}${soxRate.toFixed(2)}%`;
             const RISK = {
                 '0_1' : '공포지수 안정 + 반도체 강세 → 위험자산 선호 환경. 기술주 비중 확대 우호적.',
                 '0_0' : '공포지수 낮음, 반도체 보합권 → 전반적 안정. 추가 상승 모멘텀 탐색 구간.',
@@ -802,10 +785,7 @@
                 '3_0' : '극단적 공포, 반도체 보합 → 투매 압력 지속 가능. 신규 진입 자제.',
                 '3_-1': '극단적 공포 + 반도체 하락 → 투매 구간 가능성. 신규 매수 자제, 손절 기준 점검.',
             };
-            const badges =
-                `<span class="outlook-badge ${vixCls} me-1">${vixLabel}</span>` +
-                `<span class="outlook-badge ${soxCls} me-1">${soxLabel}</span>`;
-            group3Html = buildGroup([soxInd, vixInd], 2, buildGroupStrip('리스크/기술주', badges, RISK[`${vixLevel}_${soxLevel}`] || ''));
+            group3Html = buildGroup([soxInd, vixInd], 2, buildGroupStrip('리스크/기술주', RISK[`${vixLevel}_${soxLevel}`] || ''));
         }
 
         const comboHtml =

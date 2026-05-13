@@ -937,23 +937,36 @@ body[data-bs-theme="light"] .watchlist-group-tag {
 /* ──────────────────────────────────────────
    등락률 알림 패널 (±5%)
 ────────────────────────────────────────── */
+.tab-and-alert-wrapper {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+.tab-and-alert-wrapper .nav-tabs {
+    flex: 0 0 auto;
+    margin-bottom: 0;
+}
 .price-alert-panel {
     display: none;
-    background: linear-gradient(135deg, rgba(30,33,50,0.95) 0%, rgba(25,28,44,0.95) 100%);
-    border: 1px solid rgba(255,255,255,0.12);
-    border-radius: 10px;
-    padding: 0.55rem 0.85rem;
-    margin-bottom: 0.75rem;
-    backdrop-filter: blur(4px);
+    flex: 1;
+    min-width: 0;
+    align-self: center;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
 }
 .price-alert-panel.has-alerts {
-    display: block;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    align-items: center;
+    justify-content: center;
 }
 .price-alert-header {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    margin-bottom: 0.4rem;
 }
 .price-alert-title {
     font-size: 0.72rem;
@@ -963,18 +976,8 @@ body[data-bs-theme="light"] .watchlist-group-tag {
     display: flex;
     align-items: center;
     gap: 0.35rem;
+    white-space: nowrap;
 }
-.price-alert-dismiss {
-    background: none;
-    border: none;
-    color: #6c757d;
-    font-size: 0.78rem;
-    cursor: pointer;
-    padding: 0 0.2rem;
-    line-height: 1;
-    transition: color 0.15s;
-}
-.price-alert-dismiss:hover { color: #adb5bd; }
 .price-alert-chips {
     display: flex;
     flex-wrap: wrap;
@@ -1012,17 +1015,9 @@ body[data-bs-theme="light"] .watchlist-group-tag {
     font-weight: 700;
     font-size: 0.72rem;
 }
-[data-bs-theme="light"] .price-alert-panel {
-    background: linear-gradient(135deg, rgba(255,252,235,0.98) 0%, rgba(255,249,219,0.98) 100%);
-    border-color: rgba(240,165,0,0.28);
-}
 [data-bs-theme="light"] .price-alert-title {
     color: #6b7280;
 }
-[data-bs-theme="light"] .price-alert-dismiss {
-    color: #9ca3af;
-}
-[data-bs-theme="light"] .price-alert-dismiss:hover { color: #4b5563; }
 [data-bs-theme="light"] .price-alert-chip.alert-up {
     background: rgba(220, 53, 69, 0.10);
     border-color: rgba(220, 53, 69, 0.35);
