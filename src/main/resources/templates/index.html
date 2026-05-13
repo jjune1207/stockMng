@@ -181,6 +181,19 @@
         </div>
     </div>
 
+    <!-- 관심 종목 등락률 알림 패널 (±5%) -->
+    <div class="price-alert-panel" id="priceAlertPanel">
+        <div class="price-alert-header">
+            <span class="price-alert-title">
+                <i class="bi bi-bell-fill" style="color:#f0a500;font-size:0.78rem"></i>
+                관심 종목 급등락 알림
+                <span id="priceAlertCount" class="badge" style="background:rgba(240,165,0,0.2);color:#f0a500;font-size:0.62rem;font-weight:600"></span>
+            </span>
+            <button class="price-alert-dismiss" id="priceAlertDismiss" onclick="dismissPriceAlert()" title="닫기">✕</button>
+        </div>
+        <div class="price-alert-chips" id="priceAlertChips"></div>
+    </div>
+
     <ul class="nav nav-tabs border-secondary mb-3" id="stockTab" role="tablist">
         <li class="nav-item" role="presentation">
             <button
@@ -844,6 +857,54 @@
         return [...preferred, ...rest];
     }
 
+    let priceAlertDismissed = false;
+
+    function updateWatchlistAlerts() {
+        const panel = document.getElementById('priceAlertPanel');
+        const chipsEl = document.getElementById('priceAlertChips');
+        const countEl = document.getElementById('priceAlertCount');
+        if (!panel || !chipsEl) return;
+
+        // 갱신마다 dismiss 초기화 (닫기는 현재 세션 임시 숨김)
+        priceAlertDismissed = false;
+
+        const THRESHOLD = 5.0;
+        // 심볼 기준 중복 제거 — 여러 소유자가 같은 종목 보유 시 1개로 합침
+        const seen = new Map();
+        watchlistPriceCache.forEach(r => {
+            if (r.price && Math.abs(r.price.changeRate) >= THRESHOLD) {
+                if (!seen.has(r.price.symbol)) seen.set(r.price.symbol, r);
+            }
+        });
+        const alerts = [...seen.values()]
+            .sort((a, b) => Math.abs(b.price.changeRate) - Math.abs(a.price.changeRate));
+
+        if (alerts.length === 0) {
+            panel.classList.remove('has-alerts');
+            return;
+        }
+
+        countEl.textContent = alerts.length + '개 종목';
+        chipsEl.innerHTML = alerts.map(r => {
+            const rate = r.price.changeRate;
+            const isUp = rate >= 0;
+            const sign = isUp ? '+' : '';
+            const cls = isUp ? 'alert-up' : 'alert-down';
+            const arrow = isUp ? '▲' : '▼';
+            return `<a class="price-alert-chip ${cls}" href="/chart/${escHtml(r.price.symbol)}" title="${escHtml(r.price.name)} ${sign}${rate.toFixed(2)}%">
+                ${escHtml(r.price.name)}
+                <span class="price-alert-chip-rate">${arrow} ${sign}${Math.abs(rate).toFixed(2)}%</span>
+            </a>`;
+        }).join('');
+
+        panel.classList.add('has-alerts');
+    }
+
+    function dismissPriceAlert() {
+        priceAlertDismissed = true;
+        document.getElementById('priceAlertPanel').classList.remove('has-alerts');
+    }
+
     async function fetchPrice(symbol) {
         const res = await fetch('/api/stock/' + encodeURIComponent(symbol) + '/price');
         if (!res.ok) {
@@ -1128,6 +1189,7 @@
 
             renderGroupFilter();
             renderWatchlistTable();
+            updateWatchlistAlerts();
             document.getElementById('watchlistUpdated').textContent =
                 '업데이트: ' + new Date().toLocaleTimeString('ko-KR');
         } catch (e) {
