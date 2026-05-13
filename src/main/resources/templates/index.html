@@ -15,7 +15,7 @@
         <i class="bi bi-bar-chart-fill text-warning me-2"></i>주식 분석 차트
     </a>
     <div class="d-flex align-items-center gap-3 position-relative">
-        <small class="text-secondary d-none d-md-inline">네이버 증권 API 기반 | 인기 종목 + 관심 종목</small>
+        <small class="text-secondary d-none d-md-inline">네이버 증권 API 기반 | 주요종목 + 관심 종목</small>
         <div class="d-flex align-items-center gap-1">
             <small class="text-secondary" id="nextRefresh"></small>
             <button class="btn btn-sm btn-outline-secondary stock-settings-btn"
@@ -715,11 +715,12 @@
         function rateSign(r)  { return r >= 0 ? '+' : ''; }
 
         function buildGroupStrip(label, badgesHtml, comment) {
-            return `<div class="group-outlook-strip">
+            const escaped = comment.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+            return `<div class="group-outlook-strip" data-comment="${escaped}">
                 <span class="outlook-label"><i class="bi bi-eye-fill"></i> ${label}</span>
                 <span class="outlook-divider">|</span>
                 ${badgesHtml}
-                <span class="outlook-comment">${comment}</span>
+                <span class="outlook-comment-wrap"><span class="outlook-comment">${comment}</span></span>
             </div>`;
         }
 
@@ -2326,7 +2327,7 @@
             body: JSON.stringify({ group: newGroup }),
         }).then(res => res.json()).then(items => {
             watchlistMap.clear();
-            items.forEach(item => watchlistMap.set(item.symbol, item));
+            items.forEach(item => watchlistMap.set(item.symbol, item));1
             watchlistPriceCache.forEach(r => {
                 const updated = items.find(i => i.symbol === r.item.symbol && i.owner === r.item.owner && i.group === r.item.group);
                 if (updated) r.item = updated;
