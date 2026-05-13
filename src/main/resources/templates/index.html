@@ -666,7 +666,25 @@
         const silverInd = indicators.find(i => i.id === 'SILVER');
         const wtiInd    = indicators.find(i => i.id === 'WTI');
         const usdkrwInd = indicators.find(i => i.id === 'USDKRW');
-        const others    = indicators.filter(i => !COMBO_IDS.has(i.id));
+        function buildCard(ind) {
+            const { displayName, valueStr, changeStr, rateStr, arrow, changeClass } = buildRowHtml(ind);
+            const isChartable = CHART_INDICATOR_IDS.has(ind.id);
+            const hasSpark = SPARK_INDICATOR_IDS.has(ind.id);
+            const clickable = isChartable ? ' clickable' : '';
+            const onclick = isChartable ? ` onclick="location.href='/chart/${ind.id}'"` : '';
+            const sparkCanvas = hasSpark
+                ? `<canvas class="indicator-spark" data-id="${ind.id}" width="150" height="36"></canvas>`
+                : '';
+            return `<div class="market-indicator-card${clickable}" data-id="${ind.id}"${onclick}>
+                <div class="indicator-top">
+                    <span class="indicator-name">${displayName}</span>
+                    <span class="indicator-rate ${changeClass}">${arrow} ${rateStr}</span>
+                </div>
+                <div class="indicator-value">${valueStr}</div>
+                <div class="indicator-change ${changeClass}">${changeStr}</div>
+                ${sparkCanvas}
+            </div>`;
+        }
 
         function buildComboCard(topInd, botInd) {
             const t = buildRowHtml(topInd);
@@ -692,32 +710,109 @@
             </div>`;
         }
 
-        let html = others.map(ind => {
-            const { displayName, valueStr, changeStr, rateStr, arrow, changeClass } = buildRowHtml(ind);
-            const isChartable = CHART_INDICATOR_IDS.has(ind.id);
-            const hasSpark = SPARK_INDICATOR_IDS.has(ind.id);
-            const clickable = isChartable ? ' clickable' : '';
-            const onclick = isChartable ? ` onclick="location.href='/chart/${ind.id}'"` : '';
-            const sparkCanvas = hasSpark
-                ? `<canvas class="indicator-spark" data-id="${ind.id}" width="150" height="36"></canvas>`
-                : '';
-            return `<div class="market-indicator-card${clickable}" data-id="${ind.id}"${onclick}>
-                <div class="indicator-top">
-                    <span class="indicator-name">${displayName}</span>
-                    <span class="indicator-rate ${changeClass}">${arrow} ${rateStr}</span>
-                </div>
-                <div class="indicator-value">${valueStr}</div>
-                <div class="indicator-change ${changeClass}">${changeStr}</div>
-                ${sparkCanvas}
+        function rateCls(r) { return r >= 1.0 ? 'safe' : r >= 0 ? 'caution' : r >= -1.0 ? 'warning' : 'danger'; }
+        function rateArrow(r) { return r > 0 ? '▲' : r < 0 ? '▼' : '—'; }
+        function rateSign(r)  { return r >= 0 ? '+' : ''; }
+
+        function buildGroupStrip(label, badgesHtml, comment) {
+            return `<div class="group-outlook-strip">
+                <span class="outlook-label"><i class="bi bi-eye-fill"></i> ${label}</span>
+                <span class="outlook-divider">|</span>
+                ${badgesHtml}
+                <span class="outlook-comment">${comment}</span>
             </div>`;
-        }).join('');
+        }
 
-        if (wtiInd && usdkrwInd) html += buildComboCard(wtiInd, usdkrwInd);
-        if (goldInd && silverInd)  html += buildComboCard(goldInd, silverInd);
+        function buildGroup(inds, flexVal, stripHtml) {
+            return `<div class="indicator-group" style="flex:${flexVal}"><div class="group-cards">${inds.map(buildCard).join('')}</div>${stripHtml}</div>`;
+        }
 
-        container.innerHTML = html;
+        // 국내 증시 그룹 (KOSPI + KOSDAQ)
+        const kospiInd  = indicators.find(i => i.id === 'KOSPI');
+        const kosdaqInd = indicators.find(i => i.id === 'KOSDAQ');
+        let group1Html = '';
+        if (kospiInd && kosdaqInd) {
+            const avg = (kospiInd.changeRate + kosdaqInd.changeRate) / 2;
+            const KOREA = [
+                [1.0,       'safe',    '국내 강세',     '코스피·코스닥 동반 상승 → 강세 흐름. 외국인·기관 수급 확인 후 추세 추종 고려.'],
+                [0.3,       'safe',    '국내 소폭 강세', '국내 증시 소폭 상승권 → 방향성 탐색 구간. 업종별 차별화에 주목.'],
+                [-0.3,      'caution', '국내 보합',     '코스피·코스닥 보합권 → 관망세 우세. 미 증시·환율 방향이 단기 변수.'],
+                [-1.0,      'warning', '국내 소폭 약세', '국내 증시 소폭 하락 → 단기 조정 구간. 방어적 포지션 검토.'],
+                [-Infinity, 'danger',  '국내 약세',     '코스피·코스닥 동반 하락 → 약세. 신규 매수 자제, 손절 기준 재점검 권고.'],
+            ];
+            const [, lCls, lLabel, lComment] = KOREA.find(([t]) => avg >= t);
+            const badges =
+                `<span class="outlook-badge ${lCls} me-1">${lLabel}</span>` +
+                `<span class="outlook-badge ${rateCls(kospiInd.changeRate)} me-1">KOSPI ${rateArrow(kospiInd.changeRate)} ${rateSign(kospiInd.changeRate)}${kospiInd.changeRate.toFixed(2)}%</span>` +
+                `<span class="outlook-badge ${rateCls(kosdaqInd.changeRate)} me-1">KOSDAQ ${rateArrow(kosdaqInd.changeRate)} ${rateSign(kosdaqInd.changeRate)}${kosdaqInd.changeRate.toFixed(2)}%</span>`;
+            group1Html = buildGroup([kospiInd, kosdaqInd], 2, buildGroupStrip('국내 증시', badges, lComment));
+        }
 
-        // 코스피/코스닥만 스파크라인 그리기
+        // 미국 증시 그룹 (SP500 + NASDAQ + DJI)
+        const sp500Ind  = indicators.find(i => i.id === 'SP500');
+        const nasdaqInd = indicators.find(i => i.id === 'NASDAQ');
+        const djiInd    = indicators.find(i => i.id === 'DJI');
+        let group2Html = '';
+        if (sp500Ind && nasdaqInd && djiInd) {
+            const avg = (sp500Ind.changeRate + nasdaqInd.changeRate + djiInd.changeRate) / 3;
+            const US = [
+                [1.0,       'safe',    '미국 강세',     'S&P500·나스닥·다우 전반 상승 → 미 증시 강세. 기술주·성장주 선호 환경.'],
+                [0.3,       'safe',    '미국 소폭 강세', '미 증시 소폭 상승권 → 안정적 흐름. 연준 발언·실적 등 추가 모멘텀 탐색.'],
+                [-0.3,      'caution', '미국 보합',     '미 3대 지수 보합권 → 방향성 부재. 채권 금리·달러 흐름이 단기 변수.'],
+                [-1.0,      'warning', '미국 소폭 약세', '미 증시 소폭 하락 → 단기 조정. 나스닥 변동성 확인 후 대응 권장.'],
+                [-Infinity, 'danger',  '미국 약세',     '미 3대 지수 동반 하락 → 리스크 오프. 방어주·현금 비중 확대 고려.'],
+            ];
+            const [, lCls, lLabel, lComment] = US.find(([t]) => avg >= t);
+            const badges =
+                `<span class="outlook-badge ${lCls} me-1">${lLabel}</span>` +
+                `<span class="outlook-badge ${rateCls(sp500Ind.changeRate)} me-1">S&P ${rateArrow(sp500Ind.changeRate)} ${rateSign(sp500Ind.changeRate)}${sp500Ind.changeRate.toFixed(2)}%</span>` +
+                `<span class="outlook-badge ${rateCls(nasdaqInd.changeRate)} me-1">NASDAQ ${rateArrow(nasdaqInd.changeRate)} ${rateSign(nasdaqInd.changeRate)}${nasdaqInd.changeRate.toFixed(2)}%</span>` +
+                `<span class="outlook-badge ${rateCls(djiInd.changeRate)} me-1">DOW ${rateArrow(djiInd.changeRate)} ${rateSign(djiInd.changeRate)}${djiInd.changeRate.toFixed(2)}%</span>`;
+            group2Html = buildGroup([sp500Ind, nasdaqInd, djiInd], 3, buildGroupStrip('미국 증시', badges, lComment));
+        }
+
+        // 리스크/기술주 그룹 (SOX + VIX)
+        const vixInd = indicators.find(i => i.id === 'VIX');
+        const soxInd = indicators.find(i => i.id === 'SOX');
+        let group3Html = '';
+        if (vixInd && soxInd) {
+            const vix = vixInd.currentValue;
+            const soxRate = soxInd.changeRate;
+            let vixLevel, vixCls, vixLabel;
+            if (vix < 15)      { vixLevel = 0; vixCls = 'safe';    vixLabel = `VIX ${vix.toFixed(1)} 안정`; }
+            else if (vix < 20) { vixLevel = 1; vixCls = 'caution'; vixLabel = `VIX ${vix.toFixed(1)} 보통`; }
+            else if (vix < 30) { vixLevel = 2; vixCls = 'warning'; vixLabel = `VIX ${vix.toFixed(1)} 높음`; }
+            else               { vixLevel = 3; vixCls = 'danger';  vixLabel = `VIX ${vix.toFixed(1)} 극도공포`; }
+            const soxLevel = soxRate >= 1.0 ? 1 : soxRate <= -1.0 ? -1 : 0;
+            const soxCls   = soxRate >= 1.0 ? 'safe' : soxRate <= -1.0 ? 'danger' : 'caution';
+            const soxArrow = soxRate > 0 ? '▲' : soxRate < 0 ? '▼' : '—';
+            const soxLabel = `SOX ${soxArrow} ${rateSign(soxRate)}${soxRate.toFixed(2)}%`;
+            const RISK = {
+                '0_1' : '공포지수 안정 + 반도체 강세 → 위험자산 선호 환경. 기술주 비중 확대 우호적.',
+                '0_0' : '공포지수 낮음, 반도체 보합권 → 전반적 안정. 추가 상승 모멘텀 탐색 구간.',
+                '0_-1': '공포 낮지만 반도체 차익 실현 → 단기 숨 고르기. 지지선 확인 후 대응.',
+                '1_1' : '변동성 상승 중, 반도체 반등 → 기술주 선별 매수 고려. 거래량 동반 여부 확인 필요.',
+                '1_0' : '변동성·반도체 모두 중립권 → 방향성 부재. 관망 또는 분할 접근 권장.',
+                '1_-1': '변동성 상승, 반도체 조정 → 단기 신중. 방어적 포트폴리오 유지 권고.',
+                '2_1' : '공포 고조에도 반도체 반등 → 저점 매수 시도 구간. 리스크 관리 필수.',
+                '2_0' : '공포지수 상승, 반도체 보합 → 불확실성 지속. 현금 비중 확대 고려.',
+                '2_-1': '공포 고조 + 반도체 하락 → 리스크 오프 신호. 방어주·현금 비중 확대 권고.',
+                '3_1' : '극단적 공포 속 반도체 반등 → 역발상 기회, 변동성 극심. 소량·분할 대응.',
+                '3_0' : '극단적 공포, 반도체 보합 → 투매 압력 지속 가능. 신규 진입 자제.',
+                '3_-1': '극단적 공포 + 반도체 하락 → 투매 구간 가능성. 신규 매수 자제, 손절 기준 점검.',
+            };
+            const badges =
+                `<span class="outlook-badge ${vixCls} me-1">${vixLabel}</span>` +
+                `<span class="outlook-badge ${soxCls} me-1">${soxLabel}</span>`;
+            group3Html = buildGroup([soxInd, vixInd], 2, buildGroupStrip('리스크/기술주', badges, RISK[`${vixLevel}_${soxLevel}`] || ''));
+        }
+
+        const comboHtml =
+            (wtiInd && usdkrwInd ? buildComboCard(wtiInd, usdkrwInd) : '') +
+            (goldInd && silverInd ? buildComboCard(goldInd, silverInd) : '');
+
+        container.innerHTML = group1Html + group2Html + group3Html + comboHtml;
+
         indicators.filter(ind => SPARK_INDICATOR_IDS.has(ind.id)).forEach(ind => {
             const canvas = container.querySelector(`canvas[data-id="${ind.id}"]`);
             drawSparkline(canvas, ind.history, ind.changeRate >= 0);

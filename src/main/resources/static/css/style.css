@@ -223,6 +223,19 @@ body {
     gap: 0;
     overflow: hidden;
     width: 100%;
+    align-items: stretch;
+}
+
+.indicator-group {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.group-cards {
+    display: flex;
+    flex-direction: row;
+    flex: 1;
 }
 
 .market-indicator-card {
@@ -821,6 +834,59 @@ body[data-bs-theme="light"] .watchlist-group-tag {
     color: #e9ecef;
     border-color: #495057;
 }
+
+/* ──────────────────────────────────────────
+   그룹별 시장 전망 스트립
+────────────────────────────────────────── */
+.group-outlook-strip {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    padding: 0.32rem 0.75rem;
+    border-top: 1px solid rgba(255,255,255,0.07);
+    background: rgba(0,0,0,0.15);
+    min-height: 28px;
+}
+.outlook-label {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #7c8a9a;
+    white-space: nowrap;
+    letter-spacing: 0.02em;
+}
+.outlook-divider { color: rgba(255,255,255,0.18); font-size: 0.75rem; }
+.outlook-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.12rem 0.5rem;
+    border-radius: 20px;
+    font-size: 0.69rem;
+    font-weight: 700;
+    white-space: nowrap;
+    border: 1px solid transparent;
+}
+.outlook-badge.safe    { background:rgba(40,167,69,0.15);  color:#51cf66; border-color:rgba(40,167,69,0.3); }
+.outlook-badge.caution { background:rgba(255,193,7,0.15);  color:#ffc107; border-color:rgba(255,193,7,0.3); }
+.outlook-badge.warning { background:rgba(253,126,20,0.15); color:#fd7e14; border-color:rgba(253,126,20,0.3); }
+.outlook-badge.danger  { background:rgba(220,53,69,0.15);  color:#ff6b7a; border-color:rgba(220,53,69,0.3); }
+.outlook-comment {
+    font-size: 0.75rem;
+    color: #b8c1cc;
+    line-height: 1.4;
+    flex: 1;
+    min-width: 0;
+}
+[data-bs-theme="light"] .group-outlook-strip {
+    border-top-color: rgba(0,0,0,0.07);
+    background: rgba(0,0,0,0.03);
+}
+[data-bs-theme="light"] .outlook-label  { color: #6b7280; }
+[data-bs-theme="light"] .outlook-divider { color: rgba(0,0,0,0.2); }
+[data-bs-theme="light"] .outlook-comment { color: #374151; }
 
 /* ──────────────────────────────────────────
    등락률 알림 패널 (±5%)
