@@ -136,8 +136,11 @@ http://localhost:8080
 | DELETE | `/api/stock/watchlist/{symbol\|owner\|group}` | 관심 종목 삭제 (composite key 또는 symbol) |
 | GET | `/api/stock/watchlist/groups` | 그룹 목록 조회 |
 | PUT | `/api/stock/watchlist/{symbol\|owner\|group}/group` | 그룹 이동 |
-| DELETE | `/api/stock/watchlist/groups/{groupName}` | 그룹 삭제 (소속 종목도 삭제) |
-| PUT | `/api/stock/watchlist/groups/{groupName}` | 그룹 이름 변경 |
+| DELETE | `/api/stock/watchlist/groups/{groupName}?owner=` | 그룹 삭제 (소속 종목도 삭제, owner 필터 선택) |
+| PUT | `/api/stock/watchlist/groups/{groupName}` | 그룹 이름 변경 (`owner` 필드 body에 포함) |
+| GET | `/api/stock/watchlist/owners` | 소유자 목록 조회 |
+| PUT | `/api/stock/watchlist/owners/{ownerName}` | 소유자 이름 변경 (`newName` body) |
+| DELETE | `/api/stock/watchlist/owners/{ownerName}` | 소유자 삭제 (소속 종목도 삭제) |
 | PUT | `/api/stock/watchlist/{symbol}/portfolio` | 보유수량/평균단가 업데이트 (`quantity`, `purchasePrice`) |
 
 ### 응답 예시 — 현재가 (미국 ETF)
@@ -167,7 +170,8 @@ POST /api/stock/watchlist
   "name": "삼성전자",
   "market": "코스피",
   "type": "stock",
-  "group": "성장주"
+  "group": "성장주",
+  "owner": "나"
 }
 ```
 
