@@ -72,6 +72,14 @@ java -jar build\libs\stock-chart-0.0.1-SNAPSHOT.jar
 http://localhost:8080
 ```
 
+### Railway 배포
+
+`Dockerfile` + `railway.json` 포함. Railway에서 자동 빌드·배포.
+
+- 빌드: eclipse-temurin:17-jdk-alpine 멀티스테이지
+- 포트: `PORT` 환경변수 자동 감지 (기본 8080)
+- 재시작 정책: ON_FAILURE (최대 3회)
+
 ---
 
 ## 화면 구성
@@ -290,6 +298,9 @@ stockMng/
 ├── data/
 │   ├── watchlist.json                        # 관심 종목 저장 파일 (자동 생성)
 │   └── news-keywords.json                    # 뉴스 필터 키워드 (자동 생성)
+├── Dockerfile                                    # Railway/Docker 멀티스테이지 빌드
+├── railway.json                                  # Railway 배포 설정
+├── .dockerignore
 ├── build.gradle
 ├── settings.gradle
 └── README.md
@@ -315,4 +326,3 @@ stockMng/
 | DB (H2 포함) | Caffeine 캐시 + JSON 파일로 충분 |
 | 로그인/인증 | 시세 조회 전용 앱, 인증 불필요 |
 | 실거래 주문 | 시세 조회 및 분석만 제공 |
-| Docker | JAR 직접 실행으로 충분 |
