@@ -31,6 +31,12 @@ Thymeleaf SSR (`index.html`, `chart.html`) + TradingView Lightweight Charts v4 +
 - `chart.js`: 차트 렌더링, 타임프레임, 종합 매매 분석
 - `style.css`: 다크/라이트 테마
 
+## 배포
+
+Railway 배포 지원 (`Dockerfile` + `railway.json`).
+- Dockerfile: eclipse-temurin:17-jdk-alpine 멀티스테이지 빌드
+- `PORT` 환경변수로 포트 자동 감지
+
 ## 주요 의존성
 
 Spring Boot Web + WebFlux(WebClient), Thymeleaf, Caffeine Cache, Lombok, JUnit 5

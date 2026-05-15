@@ -110,14 +110,18 @@ public class NaverStockServiceImpl implements NaverStockService {
     }
 
     /** 대표 지수 ID → Yahoo Finance 심볼 매핑 (차트 상세 페이지 지원) */
-    private static final Map<String, String> INDEX_YAHOO_SYMBOLS = Map.of(
-        "KOSPI",  "^KS11",
-        "KOSDAQ", "^KQ11",
-        "SP500",  "^GSPC",
-        "NASDAQ", "^IXIC",
-        "DJI",    "^DJI",
-        "SOX",    "^SOX",
-        "VIX",    "^VIX"
+    private static final Map<String, String> INDEX_YAHOO_SYMBOLS = Map.ofEntries(
+        Map.entry("KOSPI",  "^KS11"),
+        Map.entry("KOSDAQ", "^KQ11"),
+        Map.entry("SP500",  "^GSPC"),
+        Map.entry("NASDAQ", "^IXIC"),
+        Map.entry("DJI",    "^DJI"),
+        Map.entry("SOX",    "^SOX"),
+        Map.entry("VIX",    "^VIX"),
+        Map.entry("WTI",    "CL=F"),
+        Map.entry("USDKRW", "KRW=X"),
+        Map.entry("GOLD",   "GC=F"),
+        Map.entry("SILVER", "SI=F")
     );
 
     private String resolveYahooSymbol(String symbol) {

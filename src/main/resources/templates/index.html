@@ -45,10 +45,10 @@
     </div>
 </nav>
 
-<div class="container-fluid px-4 py-3 main-content">
-    <div class="row mb-2">
+<div class="container-fluid px-4 py-2 main-content">
+    <div class="row mb-1">
         <div class="col-lg-6 col-md-8 position-relative">
-            <div class="input-group input-group-lg">
+            <div class="input-group">
                 <span class="input-group-text bg-secondary border-secondary text-light">
                     <i class="bi bi-search"></i>
                 </span>
@@ -59,21 +59,18 @@
                     placeholder="종목명 또는 코드 검색 (예: 삼성전자, KODEX, 005930)"
                     autocomplete="off"
                 >
-                <button class="btn btn-warning" onclick="doSearch()">검색</button>
+                <button class="btn btn-warning btn-sm" onclick="doSearch()">검색</button>
             </div>
             <div
                 id="searchResults"
                 class="position-absolute bg-dark border border-secondary rounded mt-1"
                 style="z-index: 1000; display: none; max-height: 400px; overflow-y: auto; left: 12px; right: 12px;"
             ></div>
-            <div class="mt-2">
-                <small class="text-secondary">코드를 직접 입력 후 Enter를 누르면 차트로 이동합니다.</small>
-            </div>
         </div>
     </div>
 
     <!-- 주요 시장 지표 바 -->
-    <div class="market-indicator-bar border rounded mb-3" id="marketIndicatorBar">
+    <div class="market-indicator-bar border rounded mb-2" id="marketIndicatorBar">
         <div class="market-indicator-scroll" id="marketIndicatorList">
             <div class="market-indicator-card skeleton">
                 <div class="skeleton-line short"></div>
@@ -115,8 +112,8 @@
     </div>
 
     <!-- 미국 증시 뉴스 섹션 -->
-    <div class="us-news-section mb-3" id="usNewsSection">
-        <div class="d-flex align-items-center justify-content-between mb-2">
+    <div class="us-news-section mb-2" id="usNewsSection">
+        <div class="d-flex align-items-center justify-content-between mb-1">
             <h6 class="mb-0 text-secondary fw-semibold">
                 <i class="bi bi-newspaper me-1"></i>주요뉴스
                 <span id="newsKeywordBadges"></span>
@@ -159,7 +156,7 @@
             </div>
         </div>
         <div class="border rounded position-relative" id="usNewsScrollWrap" style="overflow:hidden">
-            <button class="scroll-arrow scroll-arrow-left" id="newsScrollLeft" onclick="scrollUsNews(-1)" aria-label="이전">&#8249;</button>
+            <button class="scroll-arrow scroll-arrow-left" id="newsScrollLeft" onclick="scrollUsNews(-1)" aria-label="이전"><i class="bi bi-chevron-left"></i></button>
             <div class="us-news-scroll" id="usNewsList">
                 <div class="us-news-card skeleton-news">
                     <div class="skeleton-line short mb-2" style="height:10px;width:30%"></div>
@@ -177,11 +174,11 @@
                     <div class="skeleton-line long" style="height:12px;width:70%"></div>
                 </div>
             </div>
-            <button class="scroll-arrow scroll-arrow-right" id="newsScrollRight" onclick="scrollUsNews(1)" aria-label="다음">&#8250;</button>
+            <button class="scroll-arrow scroll-arrow-right" id="newsScrollRight" onclick="scrollUsNews(1)" aria-label="다음"><i class="bi bi-chevron-right"></i></button>
         </div>
     </div>
 
-    <div class="tab-and-alert-wrapper mb-3">
+    <div class="tab-and-alert-wrapper">
         <ul class="nav nav-tabs border-secondary" id="stockTab" role="tablist">
             <li class="nav-item" role="presentation">
                 <button
@@ -248,8 +245,8 @@
 
     <div class="tab-content">
         <div class="tab-pane fade" id="stockPanel" role="tabpanel">
-            <div class="card bg-dark border-secondary">
-                <div class="card-header border-secondary d-flex justify-content-between align-items-center">
+            <div class="card bg-dark border-0">
+                <div class="card-header border-0 d-flex justify-content-between align-items-center">
                     <h5 class="mb-0"><i class="bi bi-list-ul me-2 text-warning"></i>국내 주식 코스피 상위 10개</h5>
                     <small class="text-secondary" id="stockUpdated"></small>
                 </div>
@@ -281,8 +278,8 @@
         </div>
 
         <div class="tab-pane fade" id="etfPanel" role="tabpanel">
-            <div class="card bg-dark border-secondary">
-                <div class="card-header border-secondary d-flex justify-content-between align-items-center">
+            <div class="card bg-dark border-0">
+                <div class="card-header border-0 d-flex justify-content-between align-items-center">
                     <h5 class="mb-0"><i class="bi bi-collection me-2 text-info"></i>국내 주요 ETF 17개</h5>
                     <small class="text-secondary" id="etfUpdated"></small>
                 </div>
@@ -314,8 +311,8 @@
         </div>
 
         <div class="tab-pane fade" id="usStockPanel" role="tabpanel">
-            <div class="card bg-dark border-secondary">
-                <div class="card-header border-secondary d-flex justify-content-between align-items-center">
+            <div class="card bg-dark border-0">
+                <div class="card-header border-0 d-flex justify-content-between align-items-center">
                     <div class="d-flex align-items-center gap-3">
                         <h5 class="mb-0"><i class="bi bi-globe-americas me-2 text-success"></i>미국 주식 S&P500 상위 10개</h5>
                         <div class="btn-group btn-group-sm" role="group" id="usStockCurrencyToggle">
@@ -353,8 +350,8 @@
         </div>
 
         <div class="tab-pane fade" id="usEtfPanel" role="tabpanel">
-            <div class="card bg-dark border-secondary">
-                <div class="card-header border-secondary d-flex justify-content-between align-items-center">
+            <div class="card bg-dark border-0">
+                <div class="card-header border-0 d-flex justify-content-between align-items-center">
                     <div class="d-flex align-items-center gap-3">
                         <h5 class="mb-0"><i class="bi bi-collection-fill me-2 text-primary"></i>미국 주요 ETF 15개</h5>
                         <div class="btn-group btn-group-sm" role="group" id="usEtfCurrencyToggle">
@@ -392,9 +389,9 @@
         </div>
 
         <div class="tab-pane fade show active" id="watchlistPanel" role="tabpanel">
-            <div class="card bg-dark border-secondary">
-                <div class="card-header border-secondary">
-                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+            <div class="card bg-dark border-0">
+                <div class="card-header border-0">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-1">
                         <div class="d-flex align-items-center flex-wrap gap-2">
                             <h5 class="mb-0 me-1"><i class="bi bi-bookmark-star me-2 text-success"></i>내 관심 종목 / ETF</h5>
                             <div class="btn-group btn-group-sm" role="group" id="watchlistCurrencyToggle">
@@ -423,13 +420,13 @@
                             </button>
                         </div>
                     </div>
-                    <div class="d-flex flex-wrap align-items-center gap-1 mb-1" id="ownerFilter">
+                    <div class="d-flex align-items-center gap-1 mt-2" id="ownerFilter">
                         <button class="btn btn-sm btn-info owner-filter-btn active" data-owner="__all__">전체 소유자</button>
                     </div>
-                    <div class="d-flex flex-wrap gap-1" id="groupFilter">
+                    <div class="d-flex gap-1 mt-2" id="groupFilter">
                         <button class="btn btn-sm btn-warning group-filter-btn active" data-group="__all__">전체</button>
                     </div>
-                    <div class="d-flex flex-wrap gap-1 mt-1" id="typeFilter">
+                    <div class="d-flex gap-1 mt-2" id="typeFilter">
                         <button class="btn btn-sm btn-success type-filter-btn active" data-type="__all__">전체</button>
                         <button class="btn btn-sm btn-outline-success type-filter-btn" data-type="stock">국내 주식</button>
                         <button class="btn btn-sm btn-outline-success type-filter-btn" data-type="etf">국내 ETF</button>
@@ -438,7 +435,7 @@
                     </div>
                 </div>
                 <div class="card-body p-0">
-                    <div id="watchlistSummaryBar" class="d-none watchlist-summary-bar px-3 py-2 border-bottom border-secondary">
+                    <div id="watchlistSummaryBar" class="d-none watchlist-summary-bar px-3 py-2">
                     </div>
                     <div class="table-responsive">
                         <table class="table table-dark table-hover mb-0">
@@ -618,6 +615,7 @@
             else ctx.lineTo(x, y);
         });
         ctx.stroke();
+        canvas.style.display = 'block';
     }
 
     async function loadMarketIndicators() {
@@ -639,8 +637,7 @@
 
     // 차트 상세 페이지로 이동하는 대표 지수 ID 목록
     const CHART_INDICATOR_IDS = new Set(['KOSPI', 'KOSDAQ', 'SP500', 'NASDAQ', 'DJI', 'SOX', 'VIX']);
-    // 스파크라인(미니 차트)을 표시할 지수 ID 목록 — 코스피/코스닥만
-    const SPARK_INDICATOR_IDS = new Set(['KOSPI', 'KOSDAQ']);
+    const SPARK_INDICATOR_IDS = new Set(['KOSPI', 'KOSDAQ', 'SP500', 'NASDAQ', 'DJI', 'SOX', 'VIX']);
 
     function renderMarketIndicators(indicators) {
         const container = document.getElementById('marketIndicatorList');
@@ -697,7 +694,7 @@
             const t = buildRowHtml(topInd);
             const b = buildRowHtml(botInd);
             return `<div class="market-indicator-card market-indicator-card--combo">
-                <div class="combo-row">
+                <div class="combo-row clickable" onclick="location.href='/chart/${topInd.id}'">
                     <div class="indicator-top">
                         <span class="indicator-name">${t.displayName}</span>
                         <span class="indicator-rate ${t.changeClass}">${t.arrow} ${t.rateStr}</span>
@@ -706,7 +703,7 @@
                     <div class="indicator-change ${t.changeClass}" style="font-size:0.75em">${t.changeStr}</div>
                 </div>
                 <div class="combo-divider"></div>
-                <div class="combo-row">
+                <div class="combo-row clickable" onclick="location.href='/chart/${botInd.id}'">
                     <div class="indicator-top">
                         <span class="indicator-name">${b.displayName}</span>
                         <span class="indicator-rate ${b.changeClass}">${b.arrow} ${b.rateStr}</span>
@@ -952,6 +949,20 @@
     const PREFERRED_GROUP_ORDER = ['ISA', '국내주식', '연금저축', '미국주식'];
     
     const OWNER_GROUP_ORDERS_KEY = 'ownerGroupOrders';
+    const PREFERRED_OWNER_KEY = 'preferredOwner';
+
+    function readOwnerFromUrl() {
+        return new URLSearchParams(window.location.search).get('owner');
+    }
+    function setOwnerInUrl(owner) {
+        const url = new URL(window.location.href);
+        if (owner && owner !== '__all__') {
+            url.searchParams.set('owner', owner);
+        } else {
+            url.searchParams.delete('owner');
+        }
+        history.replaceState(null, '', url);
+    }
 
     function loadGroupOrder(ownerName) {
         try {
@@ -1332,23 +1343,26 @@
         if (!container) return;
         container.innerHTML = '';
 
-        // "전체 소유자" 버튼
-        const allBtn = document.createElement('button');
-        allBtn.className = 'btn btn-sm owner-filter-btn ' + (currentOwnerFilter === '__all__' ? 'btn-primary' : 'btn-outline-primary');
-        allBtn.dataset.owner = '__all__';
-        allBtn.textContent = '전체 소유자';
-        allBtn.addEventListener('click', function() {
-            currentOwnerFilter = '__all__';
-            currentGroupFilter = '__all__';
-            // 전체 소유자 기준 그룹 목록 재계산
-            const allItems = watchlistPriceCache.map(r => r.item);
-            const rawGroups = [...new Set(allItems.map(i => i.group).filter(g => g && g.trim()))].sort();
-            groupList = applyGroupOrder(rawGroups, null);
-            renderOwnerFilter();
-            renderGroupFilter();
-            renderWatchlistTable();
-        });
-        container.appendChild(allBtn);
+        // "전체 소유자" 버튼 — 소유자가 2명 이상일 때만 표시
+        if (ownerList.length > 1) {
+            const allBtn = document.createElement('button');
+            allBtn.className = 'btn btn-sm owner-filter-btn ' + (currentOwnerFilter === '__all__' ? 'btn-primary' : 'btn-outline-primary');
+            allBtn.dataset.owner = '__all__';
+            allBtn.textContent = '전체 소유자';
+            allBtn.addEventListener('click', function() {
+                currentOwnerFilter = '__all__';
+                localStorage.removeItem(PREFERRED_OWNER_KEY);
+                setOwnerInUrl('__all__');
+                currentGroupFilter = '__all__';
+                const allItems = watchlistPriceCache.map(r => r.item);
+                const rawGroups = [...new Set(allItems.map(i => i.group).filter(g => g && g.trim()))].sort();
+                groupList = applyGroupOrder(rawGroups, null);
+                renderOwnerFilter();
+                renderGroupFilter();
+                renderWatchlistTable();
+            });
+            container.appendChild(allBtn);
+        }
 
         // 소유자별 버튼
         ownerList.forEach(owner => {
@@ -1386,6 +1400,8 @@
             ownerBtn.addEventListener('click', function(e) {
                 if (e.target.classList.contains('owner-edit-btn') || e.target.classList.contains('owner-delete-btn')) return;
                 currentOwnerFilter = owner;
+                localStorage.setItem(PREFERRED_OWNER_KEY, owner);
+                setOwnerInUrl(owner);
                 currentGroupFilter = '__all__';
                 const filteredItems = watchlistPriceCache.map(r => r.item).filter(i => i.owner === owner);
                 const rawGroups = [...new Set(filteredItems.map(i => i.group).filter(g => g && g.trim()))].sort();
@@ -2791,6 +2807,16 @@
         loadStockSettings(); // 주식·차트 갱신 주기 복원
         await loadNewsSettings(); // 뉴스 키워드 서버에서 로드 (카운트다운보다 먼저)
         bindEvents();
+        // URL 파라미터 또는 localStorage에서 소유자 필터 복원
+        const urlOwner = readOwnerFromUrl();
+        const savedOwner = localStorage.getItem(PREFERRED_OWNER_KEY);
+        if (urlOwner) {
+            currentOwnerFilter = urlOwner;
+            localStorage.setItem(PREFERRED_OWNER_KEY, urlOwner);
+        } else if (savedOwner) {
+            currentOwnerFilter = savedOwner;
+            setOwnerInUrl(savedOwner);
+        }
         await loadMarketIndicators(); // 환율 먼저 로드 (USD/KRW 변환에 필요)
         loadUsNews(); // 뉴스는 병렬로 로드
         await refreshWatchlist();
