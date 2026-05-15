@@ -79,10 +79,8 @@ public class NaverStockServiceImpl implements NaverStockService {
         "(KODEX|TIGER|KOSEF|ARIRANG|ACE|RISE|SOL|HANARO|KBSTAR|ETF|ETN|INVERS|LEVERAGE|FUTURE|S&P|NASDAQ|TOP10)",
         Pattern.CASE_INSENSITIVE
     );
-    private static final Pattern SEARCH_LIST_ITEM_PATTERN = Pattern.compile(
-        "/item/main\\.naver\\?code=([A-Z0-9]{6})[^>]*>\\s*([^<]+?)\\s*</a>",
-        Pattern.CASE_INSENSITIVE
-    );
+    /** 영문자 바로 뒤에 한글이 오는 패턴 (예: K방산 → K-방산) */
+    private static final Pattern EN_KO_PATTERN = Pattern.compile("([A-Za-z])([가-힣])");
 
     /** siseJson 응답 행 패턴: ["20230102", 55500, 56100, 55200, 55500, 10031448, 49.67] */
     private static final Pattern ROW_PATTERN = Pattern.compile(
@@ -356,10 +354,24 @@ public class NaverStockServiceImpl implements NaverStockService {
         log.info("종목 검색 요청: keyword={}", keyword);
 
         List<StockSearchDto> results = searchWithAutoComplete(keyword);
-        if (results.isEmpty()) {
-            log.info("자동완성 결과 없음, 검색 페이지 폴백: keyword={}", keyword);
-            results = searchWithFinancePage(keyword);
+        if (!results.isEmpty()) {
+            return results;
         }
+
+        // 자동완성 결과 없음 → ETF 전체 목록에서 중간 단어 포함 검색
+        log.info("자동완성 결과 없음, ETF 목록 검색 폴백: keyword={}", keyword);
+        results = searchEtfByBrandPrefix(keyword);
+
+        // 영문+한글 혼합 키워드(예: K방산)는 하이픈 삽입 변형으로도 재시도
+        if (results.isEmpty() && EN_KO_PATTERN.matcher(keyword).find()) {
+            String hyphenated = EN_KO_PATTERN.matcher(keyword).replaceAll("$1-$2");
+            log.info("하이픈 변형 재검색: {} → {}", keyword, hyphenated);
+            results = searchWithAutoComplete(hyphenated);
+            if (results.isEmpty()) {
+                results = searchEtfByBrandPrefix(hyphenated);
+            }
+        }
+
         return results;
     }
 
@@ -387,48 +399,19 @@ public class NaverStockServiceImpl implements NaverStockService {
         }
     }
 
-    private List<StockSearchDto> searchWithFinancePage(String keyword) {
-        try {
-            byte[] responseBytes = naverWebClient.get()
-                .uri(uriBuilder -> uriBuilder
-                    .scheme("https")
-                    .host("finance.naver.com")
-                    .path("/search/searchList.naver")
-                    .queryParam("query", keyword)
-                    .build())
-                .retrieve()
-                .bodyToMono(byte[].class)
-                .block();
+    private static final List<String> ETF_BRAND_PREFIXES = List.of(
+        "KODEX", "TIGER", "ACE", "RISE", "SOL", "HANARO", "KBSTAR", "ARIRANG", "KOSEF", "TIMEFOLIO"
+    );
 
-            String html = decodeEucKr(responseBytes);
-            return parseSearchListPage(html);
-        } catch (Exception e) {
-            log.error("검색 페이지 폴백 실패: keyword={}, {}", keyword, e.getMessage());
-            return Collections.emptyList();
-        }
-    }
-
-    private List<StockSearchDto> parseSearchListPage(String html) {
-        if (html == null || html.isBlank()) {
-            return Collections.emptyList();
-        }
-
+    /** ETF 브랜드 접두사 + 키워드 조합으로 자동완성 API를 반복 호출해 중간 단어 ETF 검색 */
+    private List<StockSearchDto> searchEtfByBrandPrefix(String keyword) {
         Map<String, StockSearchDto> deduped = new LinkedHashMap<>();
-        Matcher matcher = SEARCH_LIST_ITEM_PATTERN.matcher(html);
-        while (matcher.find()) {
-            String code = matcher.group(1);
-            String name = stripHtml(matcher.group(2)).trim();
-            if (code.isBlank() || name.isBlank() || deduped.containsKey(code)) {
-                continue;
+        for (String brand : ETF_BRAND_PREFIXES) {
+            for (StockSearchDto dto : searchWithAutoComplete(brand + " " + keyword)) {
+                deduped.putIfAbsent(dto.getSymbol(), dto);
             }
-            boolean isEtf = ETF_NAME_PATTERN.matcher(name).find();
-            deduped.put(code, StockSearchDto.builder()
-                .symbol(code)
-                .name(name)
-                .market("KRX")
-                .type(isEtf ? "etf" : "stock")
-                .build());
         }
+        log.info("ETF 브랜드 접두사 검색 결과: keyword={}, count={}", keyword, deduped.size());
         return new ArrayList<>(deduped.values());
     }
 

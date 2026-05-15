@@ -394,11 +394,54 @@ async function loadPriceInfo(symbol) {
         }
 
         refreshPriceDisplay();
+        loadStockNews(symbol, data.name || symbol);
 
     } catch (err) {
         document.getElementById('stockName').textContent =
             document.getElementById('stockSymbol').textContent || symbol;
+        loadStockNews(symbol, symbol);
     }
+}
+
+async function loadStockNews(symbol, stockName) {
+    var newsEl = document.getElementById('stockNewsContent');
+    if (!newsEl) return;
+    var keyword = stockName || symbol;
+    try {
+        var res = await fetch('/api/stock/news?limit=3&keywords=' + encodeURIComponent(keyword));
+        if (!res.ok) throw new Error('뉴스 로드 실패');
+        var news = await res.json();
+        if (!news || news.length === 0) {
+            newsEl.innerHTML = '<div class="text-secondary small text-center py-2">관련 뉴스 없음</div>';
+            return;
+        }
+        newsEl.innerHTML = news.map(function(item, idx) {
+            var dateStr = formatNewsDate(item.pubDate);
+            var borderClass = idx < news.length - 1 ? ' border-bottom border-secondary' : '';
+            return '<div class="py-2 px-1' + borderClass + '">' +
+                '<a href="' + escHtml(item.link) + '" target="_blank" rel="noopener noreferrer" ' +
+                'class="text-decoration-none small fw-semibold d-block mb-1 text-body" style="line-height:1.35;">' +
+                escHtml(item.title) + '</a>' +
+                '<span class="text-secondary" style="font-size:0.7rem;">' +
+                escHtml(item.source || '') + (dateStr ? ' · ' + dateStr : '') +
+                '</span></div>';
+        }).join('');
+    } catch (e) {
+        newsEl.innerHTML = '<div class="text-secondary small text-center py-2">뉴스 로드 실패</div>';
+    }
+}
+
+function formatNewsDate(pubDate) {
+    if (!pubDate) return '';
+    try {
+        var d = new Date(pubDate);
+        if (isNaN(d.getTime())) return '';
+        var month = String(d.getMonth() + 1).padStart(2, '0');
+        var day = String(d.getDate()).padStart(2, '0');
+        var hour = String(d.getHours()).padStart(2, '0');
+        var min = String(d.getMinutes()).padStart(2, '0');
+        return month + '/' + day + ' ' + hour + ':' + min;
+    } catch (e) { return ''; }
 }
 
 /** 토글 버튼 UI 갱신 */

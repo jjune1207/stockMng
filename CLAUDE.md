@@ -3,57 +3,47 @@
 ## 프로젝트 개요
 
 Java 17 + Spring Boot 3.2.5 기반 주식/ETF 분석 차트 웹앱.
-DB 없이 네이버 증권 API를 활용하여 거래량 상위 종목 조회, 관심 종목 관리, 기술적 분석(MA, 볼린저밴드), 종합 매매 분석(5개 지표), 주요 시장 지표(코스피/코스닥/환율/WTI/해외지수)를 제공한다. 분봉(1/3/10분봉) 및 일봉 타임프레임 지원.
+네이버 증권 + Yahoo Finance API로 시세·차트·시장지표 제공. DB 없음, JSON 파일 영속화.
 
-## 빌드 및 실행 명령어
+## 빌드 및 실행
 
 ```cmd
-# 개발 서버 실행 (http://localhost:8080)
-gradlew.bat bootRun
-
-# 빌드
+gradlew.bat bootRun   # 개발 서버 (http://localhost:8080)
 gradlew.bat build
-
-# JAR 실행
-java -jar build\libs\stock-chart-0.0.1-SNAPSHOT.jar
-
-# 테스트
 gradlew.bat test
-
-# 테스트 보고서: build/reports/tests/test/index.html
 ```
 
 ## 아키텍처
 
-### 레이어 구조
+`StockApiController` → `StockDataFacade` → 서비스 인터페이스 → 구현체
 
-`StockApiController` → `StockDataFacade` → 서비스 인터페이스(`NaverStockService`, `WatchlistService`) → 구현체(`NaverStockServiceImpl`, `InMemoryWatchlistService`)
-
-- **Controller**: REST API 엔드포인트(`/api/stock/**`) + Thymeleaf 뷰 라우팅
-- **StockDataFacade**: 모든 서비스 호출을 하나로 묶는 퍼사드 패턴. Controller는 이 퍼사드만 의존. 뉴스 키워드 미지정 시 `newsKeywordsService` 저장 키워드 자동 적용, trim·deduplicate 정규화 후 전달
-- **NaverStockServiceImpl**: 네이버 증권 API(시세, 검색, 분봉/일봉, 시장 지표)를 WebClient로 호출. 해외 종목(6자리 숫자 아닌 심볼)은 Yahoo Finance로 라우팅(`yahooWebClient` Bean 별도 분리). `INDEX_YAHOO_SYMBOLS` 맵으로 대표지수 ID → Yahoo 심볼 변환. `US_ETF_DESCRIPTIONS` 맵으로 미국 ETF 한글 설명. `getDomesticPopular`: 국내 주식(코스피 시총 상위 10)/ETF(인기 16종) 고정 리스트 반환. Caffeine 캐시 적용
-- **InMemoryWatchlistService**: 관심 종목을 인메모리로 관리하고 `data/watchlist.json`에 JSON 영속화. 복합키(`symbol|owner|group`) 기반 소유자·그룹별 분류(owner 기본값 '나'). 레거시 2파트 키(`symbol|group`) 자동 변환 지원. `synchronized(watchlistLock)` + 원자적 파일 쓰기(tempFile→ATOMIC_MOVE). 테스트용 생성자 주입 지원
-- **InMemoryNewsKeywordsService**: 뉴스 필터 키워드를 `data/news-keywords.json`에 영속화. `@PostConstruct`로 로드, `synchronized(keywordsLock)` + 원자적 파일 쓰기. `NewsKeywordsService` 인터페이스를 통해 Facade에서 호출
-- **IndicatorUtil**: 기술적 지표 계산 유틸리티 (MA, 볼린저밴드, RSI, MACD). Controller에서 캔들 응답에 지표를 합성할 때 직접 호출
+- **StockDataFacade**: 모든 서비스 단일 진입점. Controller는 이것만 의존
+- **NaverStockServiceImpl**: 네이버(국내) + Yahoo Finance(해외·지수·금·은). Caffeine 캐시 적용
+- **InMemoryWatchlistService**: `data/watchlist.json` 영속화. 복합키 `symbol|owner|group`
+- **InMemoryNewsKeywordsService**: `data/news-keywords.json` 영속화
+- **IndicatorUtil**: MA / 볼린저 / RSI / MACD 계산
 
 ### 프론트엔드
 
-- Thymeleaf SSR 템플릿(`index.html`, `chart.html`) + TradingView Lightweight Charts v4
-- `static/js/chart.js`: 차트 렌더링, 타임프레임 전환, 종합 매매 분석 로직
-- `static/css/style.css`: 다크/라이트 테마 (토글 지원)
+Thymeleaf SSR (`index.html`, `chart.html`) + TradingView Lightweight Charts v4 + Bootstrap 5
 
-### 데이터 흐름
-
-- 외부 API: 네이버 증권 (시세, 차트, 검색, 랭킹), Yahoo Finance (해외종목·시장지표·금/은), 한국 경제 RSS 8종 (구글뉴스/다음/한국경제/연합뉴스/매일경제/이데일리/JTBC/YTN — 소스당 1~2건, 최대 10건 수집 후 중복제거)
-- `StockPriceDto`: `currency`(KRW/USD), `description`(미국 ETF 한글 설명, optional). `WatchlistItemDto`: `quantity`(보유수량), `purchasePrice`(평균단가) 포함. 캐시: Caffeine (현재가 30초, 캔들 10분, 분봉 1분, 검색 60분, 랭킹 10분, 시장지표 5분, 뉴스 30분, 미국인기종목 30분, 국내인기종목 60분)
-- 프론트 자동 갱신: 주식/시장지표 5분, 뉴스 30분 (별도 타이머)
-- 영속화: `data/watchlist.json`, `data/news-keywords.json` (`.gitignore`에 포함)
+- `index.html`: 관심 종목 관리 (소유자·그룹·종목구분 필터, 포트폴리오, 알림), 시장지표, 뉴스
+- `chart.js`: 차트 렌더링, 타임프레임, 종합 매매 분석
+- `style.css`: 다크/라이트 테마
 
 ## 주요 의존성
 
-- Spring Boot Web + WebFlux(WebClient), Thymeleaf, Caffeine Cache, Lombok
-- 테스트: JUnit 5 (spring-boot-starter-test), reactor-test
+Spring Boot Web + WebFlux(WebClient), Thymeleaf, Caffeine Cache, Lombok, JUnit 5
 
-## API 경로 규칙
+## API 경로
 
-모든 REST API는 `/api/stock` 하위. 캔들: `/{symbol}/candle?timeframe=1|3|10|day`. 시장 지표: `/market-indicators` (코스피→코스닥→S&P500→나스닥→다우→SOX→VIX→WTI→환율→금→은). UI 지표 바는 WTI+환율, 금+은을 각각 콤보 카드(위아래 2행)로 표시. 환율: `/usdkrw-rate`. 뉴스: `/news?limit=N&keywords=k1,k2` (기본값·최대 10). 뉴스 키워드: `GET /news-keywords`, `PUT /news-keywords`. 인기 종목: `/top?type=stock|etf|us_stock|us_etf&limit=1~20` (국내 고정 인기 목록, 미국 실시간). 관심 종목 삭제: 복합키(`symbol|owner|group`) 또는 symbol 단독. 포트폴리오 업데이트: `PUT /watchlist/{symbol}/portfolio` (quantity, purchasePrice). 그룹 이동: `PUT /watchlist/{symbol|owner|group}/group`. 소유자 관리: `GET /watchlist/owners`, `PUT /watchlist/owners/{name}` (이름 변경), `DELETE /watchlist/owners/{name}`. 그룹 삭제(`DELETE /watchlist/groups/{name}?owner=`)·이름변경(`PUT /watchlist/groups/{name}`)도 owner 파라미터 지원. 대표지수(KOSPI/KOSDAQ/SP500/NASDAQ/DJI) 클릭 시 `/chart/{id}` 이동 (WTI/USDKRW는 클릭 없음).
+모든 REST: `/api/stock/**`
+
+| 경로 | 설명 |
+|------|------|
+| `/{symbol}/candle?timeframe=1\|3\|10\|day` | 캔들 + 지표 |
+| `/market-indicators` | 코스피·코스닥·S&P500·나스닥·다우·SOX·VIX·WTI·환율·금·은 |
+| `/top?type=stock\|etf\|us_stock\|us_etf` | 인기 종목 |
+| `/news`, `/news-keywords` | 뉴스 조회·키워드 관리 |
+| `/watchlist` (CRUD) | 복합키 `symbol\|owner\|group`, 포트폴리오 PUT |
+| `/watchlist/owners/**`, `/watchlist/groups/**` | 소유자·그룹 관리 |

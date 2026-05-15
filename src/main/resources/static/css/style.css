@@ -98,8 +98,9 @@ body {
     border-color: #495057 #495057 #212529 !important;
 }
 
-/* 그룹 필터 버튼 */
-.group-filter-btn {
+/* 그룹 / 종목구분 필터 버튼 */
+.group-filter-btn,
+.type-filter-btn {
     font-size: 0.78rem !important;
     padding: 2px 10px !important;
     transition: transform 0.15s, box-shadow 0.15s;
@@ -915,7 +916,7 @@ body[data-bs-theme="light"] .watchlist-group-tag {
     font-size: 0.75rem;
     color: #b8c1cc;
     line-height: 1.4;
-    animation: outlook-ticker 18s linear infinite;
+    animation: outlook-ticker 30s linear infinite;
 }
 .group-outlook-strip:hover .outlook-comment {
     animation-play-state: paused;

@@ -429,6 +429,13 @@
                     <div class="d-flex flex-wrap gap-1" id="groupFilter">
                         <button class="btn btn-sm btn-warning group-filter-btn active" data-group="__all__">전체</button>
                     </div>
+                    <div class="d-flex flex-wrap gap-1 mt-1" id="typeFilter">
+                        <button class="btn btn-sm btn-success type-filter-btn active" data-type="__all__">전체</button>
+                        <button class="btn btn-sm btn-outline-success type-filter-btn" data-type="stock">국내 주식</button>
+                        <button class="btn btn-sm btn-outline-success type-filter-btn" data-type="etf">국내 ETF</button>
+                        <button class="btn btn-sm btn-outline-success type-filter-btn" data-type="us_stock">미국 주식</button>
+                        <button class="btn btn-sm btn-outline-success type-filter-btn" data-type="us_etf">미국 ETF</button>
+                    </div>
                 </div>
                 <div class="card-body p-0">
                     <div id="watchlistSummaryBar" class="d-none watchlist-summary-bar px-3 py-2 border-bottom border-secondary">
@@ -881,12 +888,54 @@
     const searchInputEl = document.getElementById('searchInput');
     const watchlistMap = new Map();
     let searchDebounceTimer = null;
+
+    // 최근 검색 기록 (localStorage, 최대 5개)
+    const RECENT_SEARCH_KEY = 'stockMng_recentSearches';
+
+    function getRecentSearches() {
+        try {
+            return JSON.parse(localStorage.getItem(RECENT_SEARCH_KEY) || '[]');
+        } catch { return []; }
+    }
+
+    function saveRecentSearch(keyword) {
+        if (!keyword || keyword.trim().length === 0) return;
+        const kw = keyword.trim();
+        let list = getRecentSearches().filter(k => k !== kw);
+        list.unshift(kw);
+        if (list.length > 5) list = list.slice(0, 5);
+        localStorage.setItem(RECENT_SEARCH_KEY, JSON.stringify(list));
+    }
+
+    function removeRecentSearch(keyword) {
+        const list = getRecentSearches().filter(k => k !== keyword);
+        localStorage.setItem(RECENT_SEARCH_KEY, JSON.stringify(list));
+    }
+
+    function showRecentSearches() {
+        const list = getRecentSearches();
+        if (list.length === 0) {
+            searchResultsEl.style.display = 'none';
+            return;
+        }
+        const isDark = getStoredTheme() === 'dark';
+        searchResultsEl.innerHTML =
+            '<div class="px-3 pt-2 pb-1 text-secondary small fw-semibold">최근 검색</div>' +
+            list.map(kw =>
+                '<div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom border-secondary recent-search-item" style="cursor:pointer;">' +
+                '<span class="text-body recent-search-kw">' + escHtml(kw) + '</span>' +
+                '<button class="btn btn-sm p-0 text-secondary border-0 bg-transparent recent-search-del" data-kw="' + escHtml(kw) + '" title="삭제">×</button>' +
+                '</div>'
+            ).join('');
+        searchResultsEl.style.display = 'block';
+    }
     let watchlistPriceCache = []; // {item, price} 배열
     let currentGroupFilter = '__all__';
     let currentSort = { key: 'weight', asc: false };
     let groupList = [];
     let ownerList = [];
     let currentOwnerFilter = '__all__';
+    let currentTypeFilter = '__all__';
     let groupSelectorTarget = null; // 관심추가 시 그룹 선택 대상
     let dragSrcGroup = null;
 
@@ -1537,6 +1586,10 @@
         if (currentGroupFilter !== '__all__') {
             filtered = filtered.filter(r => r.item.group === currentGroupFilter);
         }
+        // 종목 구분 필터 적용
+        if (currentTypeFilter !== '__all__') {
+            filtered = filtered.filter(r => getItemType(r.item, r.price) === currentTypeFilter);
+        }
 
         renderWatchlistSummary(filtered);
 
@@ -1764,14 +1817,22 @@
     const ETF_NAME_RE = /KODEX|TIGER|KOSEF|ARIRANG|ACE|RISE|SOL|HANARO|KBSTAR|ETF|ETN/i;
     const US_ETF_NAME_RE = /ETF|Trust|Fund|ProShares|iShares|Vanguard|Invesco|Schwab|SPDR|Direxion|WisdomTree|Amplify|JPMorgan.*Income/i;
 
-    function buildTypeBadge(item, price) {
+    function getItemType(item, price) {
         const isUs = price ? (price.currency === 'USD') : /^[A-Za-z]/.test(item.symbol);
         const displayName = (price ? price.name : null) || item.name || '';
         const isEtf = item.type === 'etf' || item.type === 'us_etf' || ETF_NAME_RE.test(displayName)
             || (isUs && US_ETF_NAME_RE.test(displayName));
-        if (isUs && isEtf) return '<span class="badge bg-warning text-dark">US ETF</span>';
-        if (isUs)          return '<span class="badge bg-success">US 주식</span>';
-        if (isEtf)         return '<span class="badge bg-info">ETF</span>';
+        if (isUs && isEtf) return 'us_etf';
+        if (isUs)          return 'us_stock';
+        if (isEtf)         return 'etf';
+        return 'stock';
+    }
+
+    function buildTypeBadge(item, price) {
+        const type = getItemType(item, price);
+        if (type === 'us_etf')   return '<span class="badge bg-warning text-dark">US ETF</span>';
+        if (type === 'us_stock') return '<span class="badge bg-success">US 주식</span>';
+        if (type === 'etf')      return '<span class="badge bg-info">ETF</span>';
         return '<span class="badge bg-secondary">주식</span>';
     }
 
@@ -2107,6 +2168,9 @@
             return;
         }
         const results = await res.json();
+        if (results && results.length > 0) {
+            saveRecentSearch(keyword);
+        }
         showSearchResults(results);
     }
 
@@ -2171,6 +2235,20 @@
             window.location.href = '/chart/' + encodeURIComponent(tr.dataset.symbol);
         });
 
+        // 종목 구분 필터
+        document.getElementById('typeFilter').addEventListener('click', function(e) {
+            const btn = e.target.closest('.type-filter-btn');
+            if (!btn) return;
+            currentTypeFilter = btn.dataset.type;
+            this.querySelectorAll('.type-filter-btn').forEach(b => {
+                const isActive = b === btn;
+                b.classList.toggle('btn-success', isActive);
+                b.classList.toggle('btn-outline-success', !isActive);
+                b.classList.toggle('active', isActive);
+            });
+            renderWatchlistTable();
+        });
+
         // 관심종목 USD/KRW 토글
         document.addEventListener('click', function(e) {
             const btn = e.target.closest('.watchlist-currency-btn');
@@ -2215,11 +2293,17 @@
             }
         });
 
+        searchInputEl.addEventListener('focus', function () {
+            if (this.value.trim().length === 0) {
+                showRecentSearches();
+            }
+        });
+
         searchInputEl.addEventListener('input', function () {
             clearTimeout(searchDebounceTimer);
             const keyword = this.value.trim();
             if (keyword.length < 1) {
-                searchResultsEl.style.display = 'none';
+                showRecentSearches();
                 return;
             }
             searchDebounceTimer = setTimeout(() => {
@@ -2243,6 +2327,26 @@
         document.addEventListener('click', function (e) {
             if (!e.target.closest('#searchInput') && !e.target.closest('#searchResults')) {
                 searchResultsEl.style.display = 'none';
+            }
+
+            // 최근 검색어 클릭
+            const recentItem = e.target.closest('.recent-search-item');
+            if (recentItem) {
+                const delBtn = e.target.closest('.recent-search-del');
+                if (delBtn) {
+                    removeRecentSearch(delBtn.dataset.kw);
+                    showRecentSearches();
+                    return;
+                }
+                const kw = recentItem.querySelector('.recent-search-kw');
+                if (kw) {
+                    searchInputEl.value = kw.textContent;
+                    doSearch().catch(() => {
+                        searchResultsEl.innerHTML = '<div class="p-3 text-danger">검색 실패</div>';
+                        searchResultsEl.style.display = 'block';
+                    });
+                }
+                return;
             }
 
             const actionEl = e.target.closest('button[data-action]');
