@@ -1,6 +1,7 @@
 package com.example.stockchart.controller;
 
 import com.example.stockchart.auth.AuthController;
+import com.example.stockchart.auth.SubOwnerMappingService;
 import com.example.stockchart.dto.CandleDto;
 import com.example.stockchart.dto.MarketIndicatorDto;
 import com.example.stockchart.dto.StockPriceDto;
@@ -26,9 +27,12 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Slf4j
 @RestController
@@ -37,6 +41,7 @@ import java.util.Map;
 public class StockApiController {
 
     private final StockDataFacade stockDataFacade;
+    private final SubOwnerMappingService subOwnerMappingService;
 
     @GetMapping("/{symbol}/price")
     public ResponseEntity<StockPriceDto> getPrice(@PathVariable("symbol") String symbol) {
@@ -113,26 +118,36 @@ public class StockApiController {
     @GetMapping("/news")
     public ResponseEntity<List<UsNewsDto>> getUsNews(
         @RequestParam(name = "limit", defaultValue = "10") int limit,
-        @RequestParam(name = "keywords", required = false, defaultValue = "") String keywordsParam) {
+        @RequestParam(name = "keywords", required = false, defaultValue = "") String keywordsParam,
+        @RequestParam(name = "owner", required = false, defaultValue = "") String ownerParam,
+        HttpSession session) {
         List<String> keywords = keywordsParam.isBlank()
             ? List.of()
             : List.of(keywordsParam.split(",")).stream()
                 .map(String::trim).filter(k -> !k.isBlank())
                 .toList();
-        log.info("REST 주요 뉴스 요청: limit={}, keywords={}", limit, keywords);
-        return ResponseEntity.ok(stockDataFacade.getUsNews(limit, keywords));
+        String owner = resolveNewsOwner(ownerParam, session);
+        log.info("REST 주요 뉴스 요청: limit={}, keywords={}, owner={}", limit, keywords, owner);
+        return ResponseEntity.ok(stockDataFacade.getUsNews(limit, keywords, owner));
     }
 
     @GetMapping("/news-keywords")
-    public ResponseEntity<List<String>> getNewsKeywords() {
-        log.info("REST 뉴스 키워드 조회 요청");
-        return ResponseEntity.ok(stockDataFacade.getNewsKeywords());
+    public ResponseEntity<List<String>> getNewsKeywords(
+        @RequestParam(name = "owner", required = false, defaultValue = "") String ownerParam,
+        HttpSession session) {
+        String owner = resolveNewsOwner(ownerParam, session);
+        log.info("REST 뉴스 키워드 조회 요청: owner={}", owner);
+        return ResponseEntity.ok(stockDataFacade.getNewsKeywords(owner));
     }
 
     @PutMapping("/news-keywords")
-    public ResponseEntity<List<String>> updateNewsKeywords(@RequestBody List<String> keywords) {
-        log.info("REST 뉴스 키워드 업데이트 요청: {}개", keywords.size());
-        return ResponseEntity.ok(stockDataFacade.updateNewsKeywords(keywords));
+    public ResponseEntity<List<String>> updateNewsKeywords(
+        @RequestBody List<String> keywords,
+        @RequestParam(name = "owner", required = false, defaultValue = "") String ownerParam,
+        HttpSession session) {
+        String owner = resolveNewsOwner(ownerParam, session);
+        log.info("REST 뉴스 키워드 업데이트 요청: owner={}, {}개", owner, keywords.size());
+        return ResponseEntity.ok(stockDataFacade.updateNewsKeywords(owner, keywords));
     }
 
     @GetMapping("/usdkrw-rate")
@@ -170,9 +185,23 @@ public class StockApiController {
     @PostMapping("/watchlist")
     public ResponseEntity<List<WatchlistItemDto>> addWatchlist(
             @RequestBody WatchlistRequestDto request, HttpSession session) {
-        String owner = isAdmin(session) && request.getOwner() != null && !request.getOwner().isBlank()
-            ? request.getOwner()
-            : sessionOwner(session);
+        String sessionUser = sessionOwner(session);
+        String owner;
+        if (isAdmin(session)) {
+            owner = request.getOwner() != null && !request.getOwner().isBlank()
+                ? request.getOwner()
+                : sessionUser;
+        } else {
+            String requested = request.getOwner();
+            if (requested != null && !requested.isBlank() && !requested.equals(sessionUser)) {
+                if (!subOwnerMappingService.isSubOwnerOf(requested, sessionUser)) {
+                    throw new ResponseStatusException(HttpStatus.FORBIDDEN, "해당 소유자를 사용할 수 없습니다.");
+                }
+                owner = requested;
+            } else {
+                owner = sessionUser;
+            }
+        }
 
         WatchlistItemDto item = WatchlistItemDto.builder()
             .symbol(request.getSymbol())
@@ -252,7 +281,30 @@ public class StockApiController {
         if (isAdmin(session)) {
             return ResponseEntity.ok(stockDataFacade.getOwners());
         }
-        return ResponseEntity.ok(List.of(sessionOwner(session)));
+        String owner = sessionOwner(session);
+        List<String> result = new ArrayList<>();
+        result.add(owner);
+        result.addAll(subOwnerMappingService.getSubOwnersForAccount(owner));
+        return ResponseEntity.ok(result);
+    }
+
+    @PostMapping("/watchlist/owners")
+    public ResponseEntity<Map<String, String>> addSubOwner(
+            @RequestBody Map<String, String> body, HttpSession session) {
+        String name = body.get("name");
+        if (name == null || name.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "소유자명을 입력해 주세요."));
+        }
+        String trimmed = name.trim();
+        if (!trimmed.matches("^[\\w가-힣\\s]{1,20}$")) {
+            return ResponseEntity.badRequest().body(Map.of("error", "소유자명은 한글/영문/숫자 1~20자로 입력해 주세요."));
+        }
+        String accountName = sessionOwner(session);
+        if (subOwnerMappingService.isKnownSubOwner(trimmed) && !subOwnerMappingService.isSubOwnerOf(trimmed, accountName)) {
+            return ResponseEntity.badRequest().body(Map.of("error", "이미 다른 계정에 등록된 소유자명입니다."));
+        }
+        subOwnerMappingService.register(trimmed, accountName);
+        return ResponseEntity.ok(Map.of("name", trimmed, "account", accountName));
     }
 
     @PutMapping("/watchlist/owners/{ownerName}")
@@ -270,9 +322,16 @@ public class StockApiController {
     public ResponseEntity<List<WatchlistItemDto>> deleteOwner(
             @PathVariable("ownerName") String ownerName, HttpSession session) {
         if (!isAdmin(session)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "소유자 삭제는 관리자만 가능합니다.");
+            String sessionUser = sessionOwner(session);
+            if (ownerName.equals(sessionUser)) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "자신의 계정 소유자는 삭제할 수 없습니다.");
+            }
+            if (!subOwnerMappingService.isSubOwnerOf(ownerName, sessionUser)) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "소유자 삭제는 관리자만 가능합니다.");
+            }
         }
-        return ResponseEntity.ok(stockDataFacade.deleteOwner(ownerName));
+        subOwnerMappingService.delete(ownerName);
+        return ResponseEntity.ok(filterForSession(stockDataFacade.deleteOwner(ownerName), session));
     }
 
     @PutMapping("/watchlist/{symbol}/portfolio")
@@ -290,6 +349,15 @@ public class StockApiController {
 
     // --- 세션 헬퍼 ---
 
+    /** 뉴스 키워드 owner 결정: 어드민은 ?owner= 파라미터 우선, 일반 사용자는 세션 owner 고정 */
+    private String resolveNewsOwner(String ownerParam, HttpSession session) {
+        if (isAdmin(session) && ownerParam != null && !ownerParam.isBlank()) {
+            return ownerParam.trim();
+        }
+        String sessionUser = sessionOwner(session);
+        return sessionUser != null ? sessionUser : "";
+    }
+
     private String sessionOwner(HttpSession session) {
         return (String) session.getAttribute(AuthController.SESSION_OWNER);
     }
@@ -301,7 +369,10 @@ public class StockApiController {
     private List<WatchlistItemDto> filterForSession(List<WatchlistItemDto> items, HttpSession session) {
         if (isAdmin(session)) return items;
         String owner = sessionOwner(session);
-        return items.stream().filter(i -> owner.equals(i.getOwner())).toList();
+        Set<String> ownersForSession = new HashSet<>();
+        ownersForSession.add(owner);
+        ownersForSession.addAll(subOwnerMappingService.getSubOwnersForAccount(owner));
+        return items.stream().filter(i -> ownersForSession.contains(i.getOwner())).toList();
     }
 
     private void assertOwnership(String compositeKey, String owner) {

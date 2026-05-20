@@ -7,7 +7,6 @@ import com.example.stockchart.dto.StockSearchDto;
 import com.example.stockchart.dto.UsNewsDto;
 import com.example.stockchart.exception.StockApiException;
 import com.example.stockchart.service.NaverStockService;
-import com.example.stockchart.service.NewsKeywordsService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -51,17 +50,14 @@ public class NaverStockServiceImpl implements NaverStockService {
     private final WebClient naverWebClient;
     private final WebClient yahooWebClient;
     private final ObjectMapper objectMapper;
-    private final NewsKeywordsService newsKeywordsService;
 
     public NaverStockServiceImpl(
             @Qualifier("naverWebClient") WebClient naverWebClient,
             @Qualifier("yahooWebClient") WebClient yahooWebClient,
-            ObjectMapper objectMapper,
-            NewsKeywordsService newsKeywordsService) {
+            ObjectMapper objectMapper) {
         this.naverWebClient = naverWebClient;
         this.yahooWebClient = yahooWebClient;
         this.objectMapper = objectMapper;
-        this.newsKeywordsService = newsKeywordsService;
     }
 
     @Value("${naver.stock-basic-url}")
@@ -1415,15 +1411,12 @@ public class NaverStockServiceImpl implements NaverStockService {
     public List<UsNewsDto> getUsNews(int limit, List<String> keywords) {
         int safeLimit = Math.min(Math.max(limit, 1), 10);
         final int PER_SOURCE = 4;
-        List<String> effectiveKeywords = (keywords == null || keywords.isEmpty())
-            ? newsKeywordsService.getKeywords()
-            : keywords;
-        List<String> normalizedKeywords = effectiveKeywords.stream()
+        List<String> normalizedKeywords = (keywords == null ? List.<String>of() : keywords).stream()
             .map(keyword -> keyword == null ? "" : keyword.trim())
             .filter(keyword -> !keyword.isBlank())
             .distinct()
             .collect(Collectors.toList());
-        log.info("미국 뉴스 조회 시작: limit={}, keywords={}", safeLimit, effectiveKeywords);
+        log.info("미국 뉴스 조회 시작: limit={}, keywords={}", safeLimit, normalizedKeywords);
 
         List<UsNewsDto> all = new ArrayList<>();
 

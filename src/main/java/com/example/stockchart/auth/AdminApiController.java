@@ -26,11 +26,19 @@ public class AdminApiController {
 
     private final OwnerAuthService ownerAuthService;
     private final StockDataFacade stockDataFacade;
+    private final SubOwnerMappingService subOwnerMappingService;
 
     @GetMapping("/accounts")
     public ResponseEntity<List<String>> getAccounts(HttpSession session) {
         assertAdmin(session);
         return ResponseEntity.ok(ownerAuthService.getAccountNames());
+    }
+
+    @GetMapping("/owner-hierarchy")
+    public ResponseEntity<Map<String, List<String>>> getOwnerHierarchy(HttpSession session) {
+        assertAdmin(session);
+        List<String> accounts = ownerAuthService.getAccountNames();
+        return ResponseEntity.ok(subOwnerMappingService.getHierarchyForAccounts(accounts));
     }
 
     @PostMapping("/accounts")

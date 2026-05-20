@@ -22,7 +22,9 @@ DB 없이 네이버 증권 API와 Yahoo Finance를 활용하여 거래량 상위
 - **주요 시장 지표**: 코스피, 코스닥, S&P 500, 나스닥, 다우지수, 필라델피아반도체(SOX), VIX 공포지수 실시간 표시. WTI+환율(USD/KRW), 금(Gold)+은(Silver)은 각각 하나의 콤보 카드(위아래 2행)로 표시. 코스피/코스닥/S&P500/나스닥/다우 클릭 시 차트 상세 페이지 이동
 - **해외 종목 지원**: Yahoo Finance 연동으로 미국 주식 시세·차트 조회, 원화/달러 가격 토글. 미국 ETF는 한글 설명 표시
 - **주요뉴스**: 8개 RSS 소스(구글뉴스/다음/한국경제/연합뉴스/매일경제/이데일리/JTBC/YTN)에서 설정 키워드 필터링, 36시간 이내 뉴스, 중복 제거 후 최대 10건 수집 (30분 자동 갱신)
-- **뉴스 키워드 설정**: 필터 키워드를 서버(`data/news-keywords.json`)에 영속화, 설정 화면에서 편집 가능
+- **뉴스 키워드 설정**: 소유자별로 독립된 필터 키워드를 서버(`data/news-keywords.json`)에 영속화. 어드민은 소유자 선택 드롭다운으로 각 소유자 키워드 편집 가능
+- **로그인/계정 관리**: 세션 기반 인증. 관리자(admin) 계정은 전체 소유자·계정 관리 가능. 일반 계정은 자신의 소유자와 서브소유자만 관리
+- **서브소유자**: 일반 계정이 추가할 수 있는 보조 소유자. 관심 종목/포트폴리오를 인물별로 분리 관리 (예: 가족 구성원별 포트폴리오)
 - **다크/라이트 모드 전환**: 상단 토글 버튼으로 테마 변경 (localStorage 저장, 메인/차트 페이지 모두 지원)
 
 ---
@@ -34,7 +36,8 @@ DB 없이 네이버 증권 API와 Yahoo Finance를 활용하여 거래량 상위
 | Backend | Java 17, Spring Boot 3.2.5, Gradle 8.7 |
 | HTTP Client | WebClient (Spring WebFlux) |
 | 캐시 | Caffeine Cache (인메모리) |
-| 데이터 영속화 | JSON 파일 (`data/watchlist.json`, `data/news-keywords.json`) |
+| 인증 | 세션 기반 로그인 (관리자 / 일반 계정 구분, `data/owners.json` 영속화) |
+| 데이터 영속화 | JSON 파일 (`data/watchlist.json`, `data/news-keywords.json`, `data/sub-owner-mapping.json`) |
 | Frontend | Thymeleaf, TradingView Lightweight Charts v4, Bootstrap 5 |
 | 데이터 소스 | 네이버 증권 API (시세, 검색, 거래량 랭킹), Yahoo Finance (해외 종목, 시장지표, 금·은) |
 
@@ -144,9 +147,14 @@ http://localhost:8080
 | GET | `/api/stock/top?type=stock&limit=10` | 거래량 상위 목록 (`type`: `stock`/`etf`/`us_stock`/`us_etf`, 10분 캐시) |
 | GET | `/api/stock/market-indicators` | 주요 시장 지표 (코스피/코스닥/S&P500/나스닥/다우/SOX/VIX/WTI/환율/금/은, 5분 캐시) |
 | GET | `/api/stock/usdkrw-rate` | USD/KRW 환율 조회 |
-| GET | `/api/stock/news?limit=10&keywords=미국,나스닥` | 주요 뉴스 (8개 RSS 소스, 30분 캐시, 기본값·최대 10건) |
-| GET | `/api/stock/news-keywords` | 뉴스 필터 키워드 목록 조회 |
-| PUT | `/api/stock/news-keywords` | 뉴스 필터 키워드 업데이트 (서버 영속화) |
+| GET | `/api/stock/news?limit=10&keywords=미국,나스닥` | 주요 뉴스 (8개 RSS 소스, 30분 캐시, 기본값·최대 10건). keywords 미입력 시 세션 소유자 키워드 자동 적용 |
+| GET | `/api/stock/news-keywords?owner=` | 소유자별 뉴스 필터 키워드 조회 (어드민: `?owner=` 지정, 일반: 세션 소유자 고정) |
+| PUT | `/api/stock/news-keywords?owner=` | 소유자별 뉴스 필터 키워드 업데이트 (서버 영속화) |
+| POST | `/api/stock/watchlist/owners` | 서브소유자 등록 (일반 계정 가능, 세션 계정에 귀속) |
+| GET | `/api/admin/accounts` | 계정 목록 조회 (어드민 전용) |
+| GET | `/api/admin/owner-hierarchy` | 계정별 서브소유자 계층 조회 (어드민 전용) |
+| POST | `/api/admin/accounts` | 계정 생성 (어드민 전용, 초기 비밀번호 자동 설정) |
+| DELETE | `/api/admin/accounts/{name}` | 계정 삭제 (어드민 전용, 소속 종목도 삭제) |
 | GET | `/api/stock/watchlist` | 관심 종목 목록 조회 |
 | POST | `/api/stock/watchlist` | 관심 종목 추가 (`group` 필드 필수) |
 | DELETE | `/api/stock/watchlist/{symbol\|owner\|group}` | 관심 종목 삭제 (composite key 또는 symbol) |
@@ -191,10 +199,10 @@ POST /api/stock/watchlist
 }
 ```
 
-### 요청 예시 — 뉴스 키워드 업데이트
+### 요청 예시 — 뉴스 키워드 업데이트 (어드민: 특정 소유자 지정)
 
 ```json
-PUT /api/stock/news-keywords
+PUT /api/stock/news-keywords?owner=홍길동
 ["미국", "트럼프", "나스닥", "S&P", "다우", "NASDAQ", "코스피"]
 ```
 
@@ -213,9 +221,18 @@ PUT /api/stock/news-keywords
 
 ### 뉴스 키워드 (`data/news-keywords.json`)
 
-- 뉴스 필터 키워드를 서버 파일로 영속화 (`NewsKeywordsService`)
-- 파일 없을 경우 기본 키워드로 자동 초기화
-- 설정 화면에서 추가/삭제 후 즉시 서버에 반영
+- 소유자별 독립 키워드를 JSON 객체 형태로 영속화 (`{"소유자명": ["kw1", "kw2"]}`)
+- 소유자 미등록 시 기본 키워드(미국, 나스닥, S&P500, Fed 등) 자동 반환
+- 어드민은 모든 소유자의 키워드를 조회·편집 가능
+
+### 서브소유자 매핑 (`data/sub-owner-mapping.json`)
+
+- 서브소유자명 → 부모 계정명 매핑 저장 (`{"서브소유자": "계정명"}`)
+- 일반 계정은 자신의 계정에 귀속된 서브소유자만 관리 가능
+
+### 계정 정보 (`data/owners.json`)
+
+- 계정명, 비밀번호(해시), 관리자 여부 저장
 
 `data/` 디렉토리는 `.gitignore`에 포함되어 있습니다.
 
@@ -260,21 +277,27 @@ gradlew.bat test
 stockMng/
 ├── src/main/java/com/example/stockchart/
 │   ├── StockChartApplication.java
+│   ├── auth/
+│   │   ├── AuthController.java               # 로그인/로그아웃/비밀번호 변경 (세션 기반)
+│   │   ├── AdminApiController.java           # 어드민 전용 REST API (/api/admin/**)
+│   │   ├── OwnerAuthService.java             # 계정 인증·관리 (owners.json 영속화)
+│   │   ├── OwnerAccount.java                 # 계정 도메인 (이름, 비밀번호해시, isAdmin)
+│   │   └── SubOwnerMappingService.java       # 서브소유자↔계정 매핑 (sub-owner-mapping.json)
 │   ├── config/
 │   │   ├── WebClientConfig.java              # 네이버/야후 API용 WebClient Bean
 │   │   └── CacheConfig.java                  # Caffeine 캐시 설정
 │   ├── controller/
 │   │   ├── ChartViewController.java          # Thymeleaf 페이지 라우팅 + favicon
-│   │   └── StockApiController.java           # REST API 엔드포인트
+│   │   └── StockApiController.java           # REST API 엔드포인트 (세션 기반 권한 분기)
 │   ├── service/
 │   │   ├── NaverStockService.java            # 네이버 조회 인터페이스
 │   │   ├── WatchlistService.java             # 관심 종목 인터페이스
-│   │   ├── NewsKeywordsService.java          # 뉴스 키워드 인터페이스
+│   │   ├── NewsKeywordsService.java          # 뉴스 키워드 인터페이스 (소유자별)
 │   │   ├── StockDataFacade.java              # 서비스 퍼사드
 │   │   └── impl/
 │   │       ├── NaverStockServiceImpl.java        # 네이버/야후 증권 API 구현
 │   │       ├── InMemoryWatchlistService.java     # 관심 종목 (그룹별 분류, JSON 영속화)
-│   │       └── InMemoryNewsKeywordsService.java  # 뉴스 키워드 (JSON 영속화)
+│   │       └── InMemoryNewsKeywordsService.java  # 소유자별 뉴스 키워드 (JSON 영속화)
 │   ├── dto/
 │   │   ├── CandleDto.java
 │   │   ├── StockPriceDto.java                # currency(KRW/USD), description(ETF 한글 설명) 포함
@@ -297,12 +320,11 @@ stockMng/
 │   │   └── css/style.css                     # 다크/라이트 테마 스타일
 │   └── application.yml
 ├── src/test/java/com/example/stockchart/
-│   ├── service/impl/InMemoryWatchlistServiceTest.java
-│   ├── service/impl/InMemoryNewsKeywordsServiceTest.java
-│   └── util/IndicatorUtilTest.java
 ├── data/
 │   ├── watchlist.json                        # 관심 종목 저장 파일 (자동 생성)
-│   └── news-keywords.json                    # 뉴스 필터 키워드 (자동 생성)
+│   ├── news-keywords.json                    # 소유자별 뉴스 필터 키워드 (자동 생성)
+│   ├── owners.json                           # 계정 정보 (자동 생성)
+│   └── sub-owner-mapping.json               # 서브소유자↔계정 매핑 (자동 생성)
 ├── Dockerfile                                    # Railway/Docker 멀티스테이지 빌드
 ├── railway.json                                  # Railway 배포 설정
 ├── .dockerignore
@@ -329,5 +351,4 @@ stockMng/
 | 항목 | 사유 |
 |------|------|
 | DB (H2 포함) | Caffeine 캐시 + JSON 파일로 충분 |
-| 로그인/인증 | 시세 조회 전용 앱, 인증 불필요 |
 | 실거래 주문 | 시세 조회 및 분석만 제공 |

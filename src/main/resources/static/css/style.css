@@ -556,6 +556,26 @@ body[data-bs-theme="light"] .watchlist-group-tag {
     box-shadow: 0 0 0 0.2rem rgba(27, 107, 181, 0.2) !important;
 }
 
+body[data-bs-theme="light"] .form-control,
+body[data-bs-theme="light"] .form-select {
+    background-color: #faf8f4 !important;
+    color: #2b2925 !important;
+    border-color: #c8c3b8 !important;
+}
+
+body[data-bs-theme="light"] .form-control:focus,
+body[data-bs-theme="light"] .form-select:focus {
+    background-color: #faf8f4 !important;
+    color: #2b2925 !important;
+    border-color: #a89e90 !important;
+    box-shadow: 0 0 0 0.2rem rgba(43, 41, 37, 0.1) !important;
+}
+
+body[data-bs-theme="light"] .form-control::placeholder,
+body[data-bs-theme="light"] .form-select::placeholder {
+    color: #a09c97 !important;
+}
+
 [data-bs-theme="light"] .input-group-lg .input-group-text,
 [data-bs-theme="light"] .input-group .input-group-text {
     background-color: #ede9e0 !important;
@@ -1247,4 +1267,50 @@ body[data-bs-theme="light"] .watchlist-group-tag {
     background: rgba(19, 23, 34, 0.85);
     z-index: 10;
     border-radius: 4px;
+}
+
+/* 계정 관리 모달 — 다크 (기본) */
+.admin-modal-content {
+    background-color: #1e2130;
+    color: #e9ecef;
+    border-color: #495057;
+}
+.admin-modal-header {
+    border-color: #495057 !important;
+}
+.admin-modal-close {
+    filter: invert(1) grayscale(100%) brightness(200%);
+}
+.admin-modal-input {
+    background-color: #212529;
+    color: #f8f9fa;
+    border-color: #495057;
+}
+.admin-modal-input::placeholder { color: #6c757d; }
+.admin-modal-hr { border-color: #495057 !important; }
+.admin-modal-table { --bs-table-bg: transparent; --bs-table-striped-bg: rgba(255,255,255,0.04); }
+
+/* 계정 관리 모달 — 라이트 */
+[data-bs-theme="light"] .admin-modal-content {
+    background-color: #faf8f4;
+    color: #2b2925;
+    border-color: #c8c3b8;
+}
+[data-bs-theme="light"] .admin-modal-header {
+    border-color: #c8c3b8 !important;
+}
+[data-bs-theme="light"] .admin-modal-close {
+    filter: none;
+}
+[data-bs-theme="light"] .admin-modal-input {
+    background-color: #faf8f4;
+    color: #2b2925;
+    border-color: #c8c3b8;
+}
+[data-bs-theme="light"] .admin-modal-input::placeholder { color: #9e9a93; }
+[data-bs-theme="light"] .admin-modal-hr { border-color: #c8c3b8 !important; }
+[data-bs-theme="light"] .admin-modal-table { --bs-table-striped-bg: rgba(0,0,0,0.03); }
+[data-bs-theme="light"] .admin-modal-table .table-secondary {
+    --bs-table-bg: #ede9e0;
+    --bs-table-color: #2b2925;
 }

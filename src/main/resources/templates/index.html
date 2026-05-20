@@ -142,6 +142,16 @@
         </div>
         <!-- 뉴스 설정 패널 -->
         <div class="news-settings-panel" id="newsSettingsPanel">
+            <!-- 어드민 전용: 소유자 선택 -->
+            <div class="news-settings-row" id="newsOwnerRow" style="display:none">
+                <div class="w-100">
+                    <label class="news-settings-label mb-1">소유자 선택
+                        <span class="news-settings-hint">(소유자별 키워드 관리)</span>
+                    </label>
+                    <select class="form-select form-select-sm" id="newsOwnerSelect" onchange="onNewsOwnerChange()">
+                    </select>
+                </div>
+            </div>
             <div class="news-settings-row">
                 <div class="flex-grow-1">
                     <label class="news-settings-label mb-1">키워드 필터
@@ -551,6 +561,10 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script th:inline="javascript">
+    const PAGE_IS_ADMIN = /*[[${isAdmin != null && isAdmin}]]*/ false;
+    const PAGE_CURRENT_OWNER = /*[[${currentOwner}]]*/ '';
+</script>
 <script>
     /* ── 주요 시장 지표 ── */
 
@@ -884,7 +898,25 @@
 
         localStorage.setItem('theme', theme);
 
-        // 그룹 필터 버튼 색상 테마에 맞게 재렌더
+        // 그룹 이동 셀렉트 박스 테마 갱신
+        const selBg = isDark ? '#212529' : '#faf8f4';
+        const selColor = isDark ? '#f8f9fa' : '#2b2925';
+        const selBorder = isDark ? '#6c757d' : '#c8c3b8';
+        document.querySelectorAll('.group-move-select').forEach(el => {
+            el.style.backgroundColor = selBg;
+            el.style.color = selColor;
+            el.style.borderColor = selBorder;
+        });
+
+        // 소유자 추가 인풋 테마 갱신
+        const ownerInput = document.getElementById('newOwnerInput');
+        if (ownerInput) {
+            ownerInput.style.backgroundColor = isDark ? '#212529' : '#faf8f4';
+            ownerInput.style.color = isDark ? '#f8f9fa' : '#2b2925';
+            ownerInput.style.borderColor = isDark ? '#6c757d' : '#c8c3b8';
+        }
+
+        // 그룹 필터 버튼 색상 테마에 맞게 재렌더 (그룹 인풋 스타일은 renderGroupFilter 내부에서 갱신)
         if (typeof renderGroupFilter === 'function') {
             renderGroupFilter();
         }
@@ -1123,17 +1155,38 @@
     // ── 뉴스 설정 (서버 news-keywords.json 영속화) ─────────────────────────
     const NEWS_INTERVAL_KEY = 'stockmng_news_interval';
     let newsSettings = { keywords: [], interval: 1800 };
+    let newsSettingsOwner = ''; // 현재 설정 패널에 표시 중인 owner (admin only)
 
-    async function loadNewsSettings() {
+    async function loadNewsSettings(ownerParam) {
         // 갱신 주기는 localStorage 유지 (개인 설정)
         try {
             const saved = localStorage.getItem(NEWS_INTERVAL_KEY);
             if (saved) newsSettings.interval = parseInt(saved, 10) || 1800;
         } catch (e) { /* 기본값 사용 */ }
 
+        // 어드민: 소유자 선택 행 표시 + 소유자 목록 로드
+        const ownerRow = document.getElementById('newsOwnerRow');
+        const ownerSelect = document.getElementById('newsOwnerSelect');
+        if (PAGE_IS_ADMIN && ownerRow && ownerSelect) {
+            ownerRow.style.display = '';
+            try {
+                const ownersRes = await fetch('/api/stock/watchlist/owners');
+                if (ownersRes.ok) {
+                    const owners = await ownersRes.json();
+                    ownerSelect.innerHTML = owners.map(o =>
+                        `<option value="${escHtml(o)}"${o === newsSettingsOwner ? ' selected' : ''}>${escHtml(o)}</option>`
+                    ).join('');
+                    if (!newsSettingsOwner && owners.length > 0) newsSettingsOwner = owners[0];
+                }
+            } catch (e) { /* 목록 로드 실패 무시 */ }
+        }
+
+        const targetOwner = ownerParam !== undefined ? ownerParam : (PAGE_IS_ADMIN ? newsSettingsOwner : '');
+        const ownerQuery = targetOwner ? `?owner=${encodeURIComponent(targetOwner)}` : '';
+
         // 키워드는 서버에서 로드
         try {
-            const res = await fetch('/api/stock/news-keywords');
+            const res = await fetch('/api/stock/news-keywords' + ownerQuery);
             if (res.ok) newsSettings.keywords = await res.json();
         } catch (e) { /* 기본값 유지 */ }
 
@@ -1144,6 +1197,13 @@
         renderKeywordBadges();
     }
 
+    async function onNewsOwnerChange() {
+        const ownerSelect = document.getElementById('newsOwnerSelect');
+        if (!ownerSelect) return;
+        newsSettingsOwner = ownerSelect.value;
+        await loadNewsSettings(newsSettingsOwner);
+    }
+
     async function saveNewsSettings() {
         const kwInput  = document.getElementById('newsKeywordInput');
         const ivSelect = document.getElementById('newsIntervalSelect');
@@ -1151,9 +1211,11 @@
         const newKeywords = rawKw.split(',').map(k => k.trim()).filter(k => k.length > 0);
         newsSettings.interval = ivSelect ? parseInt(ivSelect.value, 10) : 1800;
 
-        // 키워드 서버 저장
+        // 키워드 서버 저장 (어드민은 선택한 owner, 일반 사용자는 서버가 세션 owner 사용)
+        const ownerQuery = PAGE_IS_ADMIN && newsSettingsOwner
+            ? `?owner=${encodeURIComponent(newsSettingsOwner)}` : '';
         try {
-            const res = await fetch('/api/stock/news-keywords', {
+            const res = await fetch('/api/stock/news-keywords' + ownerQuery, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(newKeywords)
@@ -1178,10 +1240,8 @@
         const visible = panel.style.display !== 'none';
         panel.style.display = visible ? 'none' : 'block';
         if (!visible) {
-            const kwInput  = document.getElementById('newsKeywordInput');
-            const ivSelect = document.getElementById('newsIntervalSelect');
-            if (kwInput)  kwInput.value  = newsSettings.keywords.join(', ');
-            if (ivSelect) ivSelect.value = String(newsSettings.interval);
+            // 패널 열 때 현재 owner의 키워드 표시 (어드민은 소유자 목록도 갱신)
+            loadNewsSettings(PAGE_IS_ADMIN ? newsSettingsOwner : undefined);
         }
     }
 
@@ -1219,6 +1279,7 @@
             const kwParam = newsSettings.keywords.length
                 ? '&keywords=' + encodeURIComponent(newsSettings.keywords.join(','))
                 : '';
+            // 뉴스는 서버 세션 owner가 자동 적용되므로 별도 owner 파라미터 불필요 (keywords 비면 서버가 세션 owner 키워드 사용)
             const res = await fetch('/api/stock/news?limit=10' + kwParam);
             if (!res.ok) throw new Error('뉴스 조회 실패');
             const news = await res.json();
@@ -1304,8 +1365,19 @@
             watchlistMap.clear();
             items.forEach(item => watchlistMap.set(item.symbol, item));
 
-            // 소유자 목록 갱신
-            ownerList = [...new Set(items.map(i => i.owner).filter(o => o && o.trim()))].sort();
+            // 소유자 목록 갱신 — API에서 서브 소유자 포함 목록 병합
+            const ownersFromItems = [...new Set(items.map(i => i.owner).filter(o => o && o.trim()))];
+            try {
+                const ownersRes = await fetch('/api/stock/watchlist/owners');
+                if (ownersRes.ok) {
+                    const ownersFromApi = await ownersRes.json();
+                    ownerList = [...new Set([...ownersFromItems, ...ownersFromApi])].sort();
+                } else {
+                    ownerList = [...ownersFromItems].sort();
+                }
+            } catch {
+                ownerList = [...ownersFromItems].sort();
+            }
             // 현재 소유자 필터가 유효한지 확인
             if (currentOwnerFilter !== '__all__' && !ownerList.includes(currentOwnerFilter)) {
                 currentOwnerFilter = '__all__';
@@ -1397,17 +1469,20 @@
             });
             ownerBtn.appendChild(editIcon);
 
-            // 삭제 아이콘
-            const delIcon = document.createElement('i');
-            delIcon.className = 'bi bi-x-circle ms-1 owner-delete-btn';
-            delIcon.title = '소유자 삭제';
-            delIcon.addEventListener('click', function(e) {
-                e.stopPropagation();
-                if (confirm('"' + owner + '" 소유자를 삭제하시겠습니까?\n소속 종목도 함께 삭제됩니다.')) {
-                    deleteOwner(owner);
-                }
-            });
-            ownerBtn.appendChild(delIcon);
+            // 삭제 아이콘 — 비관리자의 경우 자기 자신 계정은 삭제 불가
+            const isSelfAccount = !PAGE_IS_ADMIN && owner === PAGE_CURRENT_OWNER;
+            if (!isSelfAccount) {
+                const delIcon = document.createElement('i');
+                delIcon.className = 'bi bi-x-circle ms-1 owner-delete-btn';
+                delIcon.title = '소유자 삭제';
+                delIcon.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    if (confirm('"' + owner + '" 소유자를 삭제하시겠습니까?\n소속 종목도 함께 삭제됩니다.')) {
+                        deleteOwner(owner);
+                    }
+                });
+                ownerBtn.appendChild(delIcon);
+            }
 
             // 클릭 → 필터
             ownerBtn.addEventListener('click', function(e) {
@@ -1430,6 +1505,7 @@
 
     function renderGroupFilter() {
         const container = document.getElementById('groupFilter');
+        const savedInline = document.getElementById('addGroupInline');
         container.innerHTML = '';
 
         // 현재 소유자 필터에 맞는 캐시만 사용
@@ -1532,6 +1608,18 @@
 
             container.appendChild(btn);
         });
+
+        // 그룹 추가 인풋이 열려 있었으면 복원하고 테마에 맞게 스타일 갱신
+        if (savedInline) {
+            const inp = savedInline.querySelector('input');
+            if (inp) {
+                const lt = document.body.getAttribute('data-bs-theme') === 'light';
+                inp.style.backgroundColor = lt ? '#faf8f4' : '#212529';
+                inp.style.color = lt ? '#2b2925' : '#f8f9fa';
+                inp.style.borderColor = lt ? '#c8c3b8' : '#6c757d';
+            }
+            container.appendChild(savedInline);
+        }
     }
 
     function calcGroupPortfolioSummary(filtered) {
@@ -1826,10 +1914,14 @@
             '<option value="' + escHtml(g) + '"' + (g === currentGroup ? ' selected' : '') + '>' + escHtml(g) + '</option>'
         ).join('');
         const compositeKey = symbol + '|' + (owner || '') + '|' + currentGroup;
-        return '<select class="form-select form-select-sm bg-dark text-light border-secondary group-move-select" ' +
+        const isLt = document.body.getAttribute('data-bs-theme') === 'light';
+        const selBg = isLt ? '#faf8f4' : '#212529';
+        const selColor = isLt ? '#2b2925' : '#f8f9fa';
+        const selBorder = isLt ? '#c8c3b8' : '#6c757d';
+        return '<select class="form-select form-select-sm group-move-select" ' +
             'data-composite-key="' + escHtml(compositeKey) + '" data-symbol="' + escHtml(symbol) + '" ' +
             'data-owner="' + escHtml(owner || '') + '" ' +
-            'style="width:auto;min-width:70px;font-size:0.75rem;padding:2px 6px">' +
+            'style="width:auto;min-width:70px;font-size:0.75rem;padding:2px 6px;background-color:' + selBg + ';color:' + selColor + ';border-color:' + selBorder + '">' +
             opts + '</select>';
     }
 
@@ -2476,11 +2568,13 @@
         const wrapper = document.createElement('div');
         wrapper.id = 'addOwnerInline';
         wrapper.className = 'd-inline-flex align-items-center gap-1 ms-1';
-        const isLight = document.documentElement.getAttribute('data-bs-theme') === 'light';
-        const inputCls = isLight ? 'bg-white text-dark border-secondary' : 'bg-dark text-light border-secondary';
+        const isLight = document.body.getAttribute('data-bs-theme') === 'light';
+        const inputStyle = isLight
+            ? 'width:100px;font-size:0.78rem;background-color:#faf8f4;color:#2b2925;border-color:#c8c3b8;'
+            : 'width:100px;font-size:0.78rem;background-color:#212529;color:#f8f9fa;';
         wrapper.innerHTML =
-            `<input type="text" class="form-control form-control-sm ${inputCls}" ` +
-            'id="newOwnerInput" placeholder="소유자명" style="width:100px;font-size:0.78rem">' +
+            `<input type="text" class="form-control form-control-sm border-secondary" ` +
+            `id="newOwnerInput" placeholder="소유자명" style="${inputStyle}">` +
             '<button class="btn btn-sm btn-success" id="confirmAddOwner" style="font-size:0.75rem">확인</button>' +
             '<button class="btn btn-sm btn-outline-secondary" id="cancelAddOwner" style="font-size:0.75rem">취소</button>';
         container.appendChild(wrapper);
@@ -2488,11 +2582,24 @@
         const input = document.getElementById('newOwnerInput');
         input.focus();
 
-        function doAdd() {
+        async function doAdd() {
             const trimmed = input.value.trim();
             if (!trimmed) return;
             if (ownerList.includes(trimmed)) { alert('이미 존재하는 소유자입니다.'); return; }
-            // 소유자만 추가하고 — 실제 종목이 없으면 서버엔 저장 안 되므로 UI만 반영
+            if (!PAGE_IS_ADMIN) {
+                try {
+                    const res = await fetch('/api/stock/watchlist/owners', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name: trimmed })
+                    });
+                    const data = await res.json();
+                    if (!res.ok) { alert(data.error || '소유자 추가에 실패했습니다.'); return; }
+                } catch {
+                    alert('소유자 추가에 실패했습니다.');
+                    return;
+                }
+            }
             ownerList.push(trimmed);
             wrapper.remove();
             renderOwnerFilter();
@@ -2577,11 +2684,13 @@
         const wrapper = document.createElement('div');
         wrapper.id = 'addGroupInline';
         wrapper.className = 'd-inline-flex align-items-center gap-1 ms-1';
-        const isLightTheme = document.documentElement.getAttribute('data-bs-theme') === 'light';
-        const groupInputCls = isLightTheme ? 'bg-white text-dark border-secondary' : 'bg-dark text-light border-secondary';
+        const isLightTheme = document.body.getAttribute('data-bs-theme') === 'light';
+        const groupInputStyle = isLightTheme
+            ? 'width:100px;font-size:0.78rem;background-color:#faf8f4;color:#2b2925;border-color:#c8c3b8;'
+            : 'width:100px;font-size:0.78rem;background-color:#212529;color:#f8f9fa;';
         wrapper.innerHTML =
-            `<input type="text" class="form-control form-control-sm ${groupInputCls}" ` +
-            'id="newGroupInput" placeholder="그룹명" style="width:100px;font-size:0.78rem">' +
+            `<input type="text" class="form-control form-control-sm border-secondary" ` +
+            `id="newGroupInput" placeholder="그룹명" style="${groupInputStyle}">` +
             '<button class="btn btn-sm btn-success" id="confirmAddGroup" style="font-size:0.75rem">확인</button>' +
             '<button class="btn btn-sm btn-outline-secondary" id="cancelAddGroup" style="font-size:0.75rem">취소</button>';
         container.appendChild(wrapper);
@@ -2852,17 +2961,17 @@
 <!-- 관리자 계정 관리 모달 -->
 <div class="modal fade" id="adminAccountModal" tabindex="-1" aria-labelledby="adminAccountModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content bg-dark border border-secondary text-light">
-            <div class="modal-header border-secondary">
+        <div class="modal-content admin-modal-content border">
+            <div class="modal-header admin-modal-header">
                 <h5 class="modal-title" id="adminAccountModalLabel">
                     <i class="bi bi-people-fill me-2 text-warning"></i>계정 관리
                 </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close admin-modal-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <div class="mb-3">
                     <div class="input-group input-group-sm">
-                        <input type="text" id="newAccountName" class="form-control bg-dark text-light border-secondary"
+                        <input type="text" id="newAccountName" class="form-control admin-modal-input"
                                placeholder="이름 (한글/영문/숫자 1~20자)" maxlength="20">
                         <button class="btn btn-warning btn-sm fw-semibold" onclick="createAdminAccount()">
                             <i class="bi bi-person-plus-fill me-1"></i>계정 생성
@@ -2873,7 +2982,7 @@
                     </div>
                     <div id="createAccountMsg" class="mt-1 small" style="min-height:1.2em;"></div>
                 </div>
-                <hr class="border-secondary my-2">
+                <hr class="admin-modal-hr my-2">
                 <div id="adminAccountList">
                     <div class="text-center text-secondary py-3">
                         <div class="spinner-border spinner-border-sm me-2" role="status"></div>불러오는 중...
@@ -2894,26 +3003,45 @@
     async function loadAdminAccounts() {
         const container = document.getElementById('adminAccountList');
         try {
-            const res = await fetch('/api/admin/accounts');
-            if (!res.ok) throw new Error('불러오기 실패');
-            const names = await res.json();
+            const [namesRes, hierarchyRes] = await Promise.all([
+                fetch('/api/admin/accounts'),
+                fetch('/api/admin/owner-hierarchy')
+            ]);
+            if (!namesRes.ok) throw new Error('불러오기 실패');
+            const names = await namesRes.json();
+            const hierarchy = hierarchyRes.ok ? await hierarchyRes.json() : {};
             if (names.length === 0) {
                 container.innerHTML = '<p class="text-secondary text-center mb-0">등록된 계정이 없습니다.</p>';
                 return;
             }
+            const rows = names.map(n => {
+                const subOwners = hierarchy[n] || [];
+                const subRows = subOwners.map(sub => `
+                    <tr class="table-secondary">
+                        <td class="align-middle ps-4" style="font-size:0.85rem;">
+                            <i class="bi bi-arrow-return-right me-1 text-secondary"></i>${escapeHtml(sub)}
+                            <span class="badge bg-secondary ms-1" style="font-size:0.7rem;">서브</span>
+                        </td>
+                        <td class="text-end">
+                            <button class="btn btn-sm btn-outline-danger py-0" onclick="deleteAdminSubOwner('${escapeHtml(n)}', '${escapeHtml(sub)}')">
+                                <i class="bi bi-trash3"></i>
+                            </button>
+                        </td>
+                    </tr>`).join('');
+                return `
+                    <tr>
+                        <td class="align-middle fw-semibold">${escapeHtml(n)}</td>
+                        <td class="text-end">
+                            <button class="btn btn-sm btn-outline-danger" onclick="deleteAdminAccount('${escapeHtml(n)}')">
+                                <i class="bi bi-trash3"></i>
+                            </button>
+                        </td>
+                    </tr>${subRows}`;
+            }).join('');
             container.innerHTML = `
-                <table class="table table-dark table-hover table-sm mb-0">
-                    <thead><tr><th>이름</th><th class="text-end">삭제</th></tr></thead>
-                    <tbody>${names.map(n => `
-                        <tr>
-                            <td class="align-middle">${escapeHtml(n)}</td>
-                            <td class="text-end">
-                                <button class="btn btn-sm btn-outline-danger" onclick="deleteAdminAccount('${escapeHtml(n)}')">
-                                    <i class="bi bi-trash3"></i>
-                                </button>
-                            </td>
-                        </tr>`).join('')}
-                    </tbody>
+                <table class="table table-hover table-sm mb-0 admin-modal-table">
+                    <thead><tr><th>계정 / 소유자</th><th class="text-end">삭제</th></tr></thead>
+                    <tbody>${rows}</tbody>
                 </table>`;
         } catch (e) {
             container.innerHTML = '<p class="text-danger text-center mb-0">계정 목록을 불러오지 못했습니다.</p>';
@@ -2953,9 +3081,21 @@
             const res = await fetch(`/api/admin/accounts/${encodeURIComponent(name)}`, { method: 'DELETE' });
             if (!res.ok) throw new Error('삭제 실패');
             await loadAdminAccounts();
-            loadWatchlist();
+            refreshWatchlist();
         } catch (e) {
             alert('계정 삭제에 실패했습니다.');
+        }
+    }
+
+    async function deleteAdminSubOwner(accountName, subOwnerName) {
+        if (!confirm(`"${subOwnerName}" 서브 소유자와 해당 관심 종목을 삭제하시겠습니까?`)) return;
+        try {
+            const res = await fetch(`/api/stock/watchlist/owners/${encodeURIComponent(subOwnerName)}`, { method: 'DELETE' });
+            if (!res.ok) throw new Error('삭제 실패');
+            await loadAdminAccounts();
+            refreshWatchlist();
+        } catch (e) {
+            alert('서브 소유자 삭제에 실패했습니다.');
         }
     }
 

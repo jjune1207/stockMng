@@ -20,7 +20,8 @@ gradlew.bat test
 - **StockDataFacade**: 모든 서비스 단일 진입점. Controller는 이것만 의존
 - **NaverStockServiceImpl**: 네이버(국내) + Yahoo Finance(해외·지수·금·은). Caffeine 캐시 적용
 - **InMemoryWatchlistService**: `data/watchlist.json` 영속화. 복합키 `symbol|owner|group`
-- **InMemoryNewsKeywordsService**: `data/news-keywords.json` 영속화
+- **InMemoryNewsKeywordsService**: `data/news-keywords.json` 영속화. 소유자별 독립 키워드 관리
+- **SubOwnerMappingService**: `data/sub-owner-mapping.json` 영속화. 서브소유자↔계정 매핑
 - **IndicatorUtil**: MA / 볼린저 / RSI / MACD 계산
 
 ### 프론트엔드
@@ -50,6 +51,9 @@ Spring Boot Web + WebFlux(WebClient), Thymeleaf, Caffeine Cache, Lombok, JUnit 5
 | `/{symbol}/candle?timeframe=1\|3\|10\|day` | 캔들 + 지표 |
 | `/market-indicators` | 코스피·코스닥·S&P500·나스닥·다우·SOX·VIX·WTI·환율·금·은 |
 | `/top?type=stock\|etf\|us_stock\|us_etf` | 인기 종목 |
-| `/news`, `/news-keywords` | 뉴스 조회·키워드 관리 |
+| `/news?owner=` | 뉴스 조회 (keywords 비면 세션owner 키워드 자동 적용) |
+| `/news-keywords?owner=` | 소유자별 키워드 조회·수정 (어드민: ?owner= 필수) |
 | `/watchlist` (CRUD) | 복합키 `symbol\|owner\|group`, 포트폴리오 PUT |
 | `/watchlist/owners/**`, `/watchlist/groups/**` | 소유자·그룹 관리 |
+
+어드민 전용: `/api/admin/**` (계정 목록, 소유자 계층, 계정 생성·삭제)

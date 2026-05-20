@@ -53,9 +53,9 @@ public class StockDataFacade {
         return naverStockService.getMarketIndicators();
     }
 
-    public List<UsNewsDto> getUsNews(int limit, List<String> keywords) {
+    public List<UsNewsDto> getUsNews(int limit, List<String> keywords, String owner) {
         List<String> effectiveKeywords = (keywords == null || keywords.isEmpty())
-            ? newsKeywordsService.getKeywords()
+            ? newsKeywordsService.getKeywords(owner)
             : keywords;
         List<String> normalizedKeywords = effectiveKeywords.stream()
             .map(keyword -> keyword == null ? "" : keyword.trim())
@@ -65,12 +65,12 @@ public class StockDataFacade {
         return naverStockService.getUsNews(limit, normalizedKeywords);
     }
 
-    public List<String> getNewsKeywords() {
-        return newsKeywordsService.getKeywords();
+    public List<String> getNewsKeywords(String owner) {
+        return newsKeywordsService.getKeywords(owner);
     }
 
-    public List<String> updateNewsKeywords(List<String> keywords) {
-        return newsKeywordsService.updateKeywords(keywords);
+    public List<String> updateNewsKeywords(String owner, List<String> keywords) {
+        return newsKeywordsService.updateKeywords(owner, keywords);
     }
 
     public List<WatchlistItemDto> getWatchlist() {
