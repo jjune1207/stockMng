@@ -404,8 +404,13 @@ async function loadPriceInfo(symbol) {
 }
 
 async function loadStockNews(symbol, stockName) {
+    var newsPanel = document.getElementById('stockNewsPanel');
     var newsEl = document.getElementById('stockNewsContent');
     if (!newsEl) return;
+    if (isMarketIndex(symbol)) {
+        if (newsPanel) newsPanel.style.display = 'none';
+        return;
+    }
     var keyword = stockName || symbol;
     try {
         var res = await fetch('/api/stock/news?limit=3&keywords=' + encodeURIComponent(keyword));
@@ -537,6 +542,10 @@ function updateMAValues() {
 function analyzeMA() {
     var panel = document.getElementById('analysisPanel');
     var content = document.getElementById('analysisContent');
+    if (isMarketIndex(currentSymbol)) {
+        panel.style.display = 'none';
+        return;
+    }
     if (!currentData || !currentData.candles || currentData.candles.length < 200) {
         panel.style.display = 'none';
         return;
@@ -603,12 +612,273 @@ function analyzeMA() {
     panel.style.display = 'block';
 }
 
-// ── 종합 매매 분석 ──
+// ── 대표 시장지수 목록 및 헬퍼 ──
 
-function analyzeTradingSignal() {
+var MARKET_INDEX_SYMBOLS = ['KOSPI', 'KOSDAQ', 'SP500', 'NASDAQ', 'DJI', 'SOX', 'VIX', 'WTI', 'USDKRW', 'GOLD', 'SILVER'];
+
+function isMarketIndex(symbol) {
+    return MARKET_INDEX_SYMBOLS.indexOf((symbol || '').toUpperCase()) >= 0;
+}
+
+function getMarketIndexInfo(symbol) {
+    var info = {
+        'KOSPI':  { name: '코스피 (KOSPI)',         icon: 'bi-bar-chart-fill',       keywords: '코스피,한국 증시,국내 주식시장,코스피 지수',
+                    desc: '한국 종합주가지수 (KOSPI Composite Index). 한국거래소(KRX)에 상장된 모든 보통주의 시가총액 가중 지수로, 한국 증시 전반의 흐름을 나타냅니다.' },
+        'KOSDAQ': { name: '코스닥 (KOSDAQ)',         icon: 'bi-bar-chart-fill',       keywords: '코스닥,기술주,바이오,벤처,코스닥 지수',
+                    desc: '코스닥 시장 지수. 기술·바이오·벤처 중심의 중소·성장 기업들로 구성되어 고성장 기업의 동향을 반영합니다.' },
+        'SP500':  { name: 'S&P 500',                icon: 'bi-globe-americas',       keywords: 'S&P500,미국 증시,뉴욕 증시,S&P 500',
+                    desc: '미국 대형주 500개 기업으로 구성된 미국 증시의 핵심 벤치마크 지수. 전 세계 투자자의 미국 주식시장 가늠자로 사용됩니다.' },
+        'NASDAQ': { name: '나스닥 (NASDAQ)',         icon: 'bi-globe-americas',       keywords: '나스닥,기술주,빅테크,미국 증시,나스닥 지수',
+                    desc: '나스닥 종합주가지수. 애플·마이크로소프트·엔비디아 등 기술·성장주 중심으로 구성되어 글로벌 테크 산업의 온도를 보여줍니다.' },
+        'DJI':    { name: '다우존스 (DJIA)',          icon: 'bi-globe-americas',       keywords: '다우존스,미국 증시,다우 지수,산업평균',
+                    desc: '다우존스 산업평균지수 (DJIA). 미국 우량 30개 기업으로 구성된 가장 오래된 주가지수. 전통 산업·금융·소비재 대기업의 경기 체력을 반영합니다.' },
+        'SOX':    { name: '필라델피아 반도체 (SOX)', icon: 'bi-cpu-fill',             keywords: '반도체,SOX,엔비디아,HBM,TSMC,필라델피아 반도체',
+                    desc: '필라델피아 반도체 지수 (PHLX Semiconductor). 엔비디아·TSMC·인텔 등 글로벌 반도체 기업 30여 개로 구성되어 AI·HBM·파운드리 업황의 선행지표로 활용됩니다.' },
+        'VIX':    { name: 'VIX 공포지수',           icon: 'bi-activity',             keywords: 'VIX,공포지수,시장 변동성,리스크,시장 불확실성',
+                    desc: 'CBOE 변동성 지수 (VIX). S&P500 옵션 가격에서 도출한 향후 30일 예상 변동성으로, 시장 공포·불확실성의 척도입니다. 20 이하 안정, 30 이상 공포, 40 이상 패닉으로 봅니다.' },
+        'WTI':    { name: 'WTI 유가',               icon: 'bi-droplet-fill',         keywords: '유가,원유,WTI,에너지,국제유가',
+                    desc: '서부 텍사스산 원유 (WTI) 선물 가격. 국제 원유 가격의 기준으로, 에너지·물가·글로벌 경기의 선행지표 역할을 합니다.' },
+        'USDKRW': { name: '달러/원 환율',           icon: 'bi-currency-exchange',    keywords: '달러 환율,원달러,외환시장,달러인덱스,환율',
+                    desc: '미국 달러 대 한국 원화 환율. 달러 강세 시 원화 약세로 수출기업 수익은 유리하나 수입물가 상승·외국인 자금 이탈 우려가 있습니다.' },
+        'GOLD':   { name: '금 (Gold)',               icon: 'bi-gem',                  keywords: '금 시세,금 선물,안전자산,인플레이션,금값',
+                    desc: '국제 금 선물 가격 ($/트로이온스). 인플레이션 헤지·안전자산 대표주자. 달러 약세, 지정학적 리스크 고조 시 상승하는 경향이 있습니다.' },
+        'SILVER': { name: '은 (Silver)',             icon: 'bi-gem',                  keywords: '은 시세,은 선물,산업용 금속,태양광,은값',
+                    desc: '국제 은 선물 가격 ($/트로이온스). 안전자산이자 산업용 금속으로 금보다 변동성이 크며, 태양광·전기차·전자제품 수요와 연동됩니다.' },
+    };
+    var sym = (symbol || '').toUpperCase();
+    return info[sym] || { name: sym, icon: 'bi-graph-up', desc: '', keywords: sym };
+}
+
+function generateMarketContextText(symbol, price, ma50Val, ma200Val, momentum20, momentum60, maAlignment) {
+    var sym = (symbol || '').toUpperCase();
+    var lines = [];
+    var dark = isDarkTheme();
+    var upColor   = '#ef5350';
+    var downColor = dark ? '#42a5f5' : '#1565c0';
+    var neutColor = dark ? '#ffc107' : '#d48800';
+
+    if (ma50Val && ma200Val) {
+        if (maAlignment === '정배열') {
+            lines.push('이동평균선이 <strong style="color:' + upColor + '">정배열</strong> 상태를 유지하고 있어 중장기 상승 추세가 이어지고 있습니다.');
+        } else if (maAlignment === '역배열') {
+            lines.push('이동평균선이 <strong style="color:' + downColor + '">역배열</strong> 상태로 중장기 하락 압력이 지속되고 있습니다.');
+        } else {
+            lines.push('이동평균선이 <strong style="color:' + neutColor + '">혼조</strong> 상태로 방향성을 모색하는 국면입니다.');
+        }
+    }
+
+    if (sym === 'VIX') {
+        if (price < 15) {
+            lines.push('현재 VIX가 <strong style="color:' + upColor + '">15 이하</strong>로 시장 참여자들이 매우 낙관적인 심리를 보이고 있습니다. 과도한 낙관은 조정의 전조일 수 있습니다.');
+        } else if (price < 20) {
+            lines.push('VIX가 15~20 구간으로 <strong>안정적인</strong> 시장 환경이 유지되고 있습니다.');
+        } else if (price < 30) {
+            lines.push('VIX가 20~30 구간으로 <strong style="color:' + neutColor + '">불확실성이 높아진</strong> 상태입니다. 변동성 확대에 대비한 리스크 관리가 필요합니다.');
+        } else if (price < 40) {
+            lines.push('VIX가 <strong style="color:' + downColor + '">30 이상의 공포</strong> 구간입니다. 과거 사례상 이 수준에서 역발상 매수 기회가 나타나기도 합니다.');
+        } else {
+            lines.push('VIX가 <strong style="color:' + downColor + '">40 이상의 극도의 공포</strong> 수준으로, 금융 위기급 변동성이 나타나고 있어 각별한 주의가 필요합니다.');
+        }
+    } else if (sym === 'USDKRW') {
+        if (price > 1450) {
+            lines.push('달러/원 환율이 <strong style="color:' + neutColor + '">1,450원 이상</strong>의 초고환율 구간입니다. 수출 기업엔 유리하나 수입 물가 급등 및 외국인 자금 이탈 우려가 커집니다.');
+        } else if (price > 1350) {
+            lines.push('달러/원 환율이 1,350~1,450원 구간으로 <strong>원화 약세</strong> 기조가 이어지고 있습니다. 외환시장 동향을 주시할 필요가 있습니다.');
+        } else if (price > 1250) {
+            lines.push('달러/원 환율이 1,250~1,350원 구간의 <strong>중립적</strong>인 수준입니다.');
+        } else {
+            lines.push('달러/원 환율이 1,250원 이하로 <strong>원화 강세</strong> 구간에 위치합니다. 수출기업 수익성에는 부담이 될 수 있습니다.');
+        }
+    } else if (sym === 'WTI') {
+        if (price > 90) {
+            lines.push('WTI 유가가 <strong style="color:' + neutColor + '">90달러 이상</strong>의 고유가 구간입니다. 물가 상승 압력과 경기 둔화 우려가 높아질 수 있습니다.');
+        } else if (price > 70) {
+            lines.push('WTI 유가가 70~90달러 구간의 <strong>안정적인</strong> 수준을 유지하고 있습니다.');
+        } else {
+            lines.push('WTI 유가가 <strong style="color:' + downColor + '">70달러 이하</strong>의 저유가 구간입니다. 경기 침체 우려가 반영되었을 가능성이 있습니다.');
+        }
+    } else if (sym === 'GOLD') {
+        lines.push('금은 인플레이션 헤지 및 안전자산으로 달러 약세·지정학적 리스크 고조 시 강세를 보입니다.');
+        if (momentum20 !== null && parseFloat(momentum20) > 5) {
+            lines.push('최근 1개월 강한 상승세로 <strong style="color:' + upColor + '">안전자산 수요가 높아지는</strong> 신호로 볼 수 있습니다.');
+        } else if (momentum20 !== null && parseFloat(momentum20) < -5) {
+            lines.push('최근 1개월 조정을 받고 있어 <strong style="color:' + downColor + '">리스크온 분위기</strong>가 형성될 수 있습니다.');
+        }
+    } else if (sym === 'SOX') {
+        lines.push('필라델피아 반도체 지수는 AI·데이터센터·모바일 수요를 반영하는 <strong>반도체 업황 선행지표</strong>입니다.');
+        if (ma200Val && price > ma200Val) {
+            lines.push('200일 이평선 상단을 유지하며 <strong style="color:' + upColor + '">반도체 장기 상승 사이클</strong>이 지속되고 있습니다.');
+        } else if (ma200Val && price < ma200Val) {
+            lines.push('200일 이평선 하단에 위치해 있어 <strong style="color:' + downColor + '">반도체 업황 둔화 우려</strong>가 반영되고 있습니다.');
+        }
+    }
+
+    if (momentum20 !== null) {
+        var m20 = parseFloat(momentum20);
+        if (Math.abs(m20) > 8) {
+            var dir = m20 > 0 ? '상승' : '하락';
+            var cls = m20 > 0 ? upColor : downColor;
+            lines.push('최근 1개월간 <strong style="color:' + cls + '">' + (m20 > 0 ? '+' : '') + m20 + '%의 강한 ' + dir + '세</strong>를 보이고 있습니다.');
+        }
+    }
+
+    return lines.join('<br>') || '현재 데이터를 분석 중입니다.';
+}
+
+async function analyzeMarketIndex() {
     var panel = document.getElementById('tradingAnalysisPanel');
     var content = document.getElementById('tradingAnalysisContent');
     var verdictEl = document.getElementById('tradingVerdict');
+    var titleEl = document.getElementById('tradingPanelTitle');
+
+    var maValuesPanel = document.getElementById('maValuesPanel');
+    var indicatorPanel = document.querySelector('.indicator-panel');
+    if (maValuesPanel) maValuesPanel.style.display = 'none';
+    if (indicatorPanel) indicatorPanel.style.display = 'none';
+
+    if (titleEl) {
+        titleEl.innerHTML = '<i class="bi bi-graph-up-arrow me-1"></i>시장 현황 분석';
+    }
+    if (verdictEl) {
+        verdictEl.style.display = 'none';
+        verdictEl.textContent = '';
+    }
+
+    if (!currentData || !currentData.candles || currentData.candles.length < 5) {
+        content.innerHTML = '<div class="text-secondary small">분석 데이터가 부족합니다.</div>';
+        return;
+    }
+
+    var dark = isDarkTheme();
+    var indexInfo = getMarketIndexInfo(currentSymbol);
+    var last = currentData.candles.length - 1;
+    var price = currentData.candles[last].close;
+
+    var ma20Val  = safeVal(currentData.ma20,  last);
+    var ma50Val  = safeVal(currentData.ma50,  last);
+    var ma100Val = safeVal(currentData.ma100, last);
+    var ma200Val = safeVal(currentData.ma200, last);
+
+    var momentum20 = last >= 20 ? ((price - currentData.candles[last - 20].close) / currentData.candles[last - 20].close * 100).toFixed(2) : null;
+    var momentum60 = last >= 60 ? ((price - currentData.candles[last - 60].close) / currentData.candles[last - 60].close * 100).toFixed(2) : null;
+
+    var maAlignment = '';
+    if (ma50Val && ma100Val && ma200Val) {
+        if (ma50Val > ma100Val && ma100Val > ma200Val)      maAlignment = '정배열';
+        else if (ma50Val < ma100Val && ma100Val < ma200Val) maAlignment = '역배열';
+        else                                                 maAlignment = '혼조';
+    }
+
+    var trendRows = [];
+    if (ma20Val) {
+        var d20 = ((price - ma20Val) / ma20Val * 100).toFixed(2);
+        trendRows.push({ label: 'MA 20 대비', value: (d20 > 0 ? '+' : '') + d20 + '%', desc: '20일선 ' + (price > ma20Val ? '위' : '아래') + ' (단기)', cls: price > ma20Val ? 'text-danger' : 'text-primary' });
+    }
+    if (ma50Val) {
+        var d50 = ((price - ma50Val) / ma50Val * 100).toFixed(2);
+        trendRows.push({ label: 'MA 50 대비', value: (d50 > 0 ? '+' : '') + d50 + '%', desc: '50일선 ' + (price > ma50Val ? '위' : '아래') + ' (중기)', cls: price > ma50Val ? 'text-danger' : 'text-primary' });
+    }
+    if (ma200Val) {
+        var d200 = ((price - ma200Val) / ma200Val * 100).toFixed(2);
+        trendRows.push({ label: 'MA 200 대비', value: (d200 > 0 ? '+' : '') + d200 + '%', desc: '200일선 ' + (price > ma200Val ? '위' : '아래') + ' (장기)', cls: price > ma200Val ? 'text-danger' : 'text-primary' });
+    }
+    if (momentum20 !== null) {
+        trendRows.push({ label: '1개월 변화', value: (parseFloat(momentum20) >= 0 ? '+' : '') + momentum20 + '%', desc: '최근 20 거래일 등락률', cls: parseFloat(momentum20) >= 0 ? 'text-danger' : 'text-primary' });
+    }
+    if (momentum60 !== null) {
+        trendRows.push({ label: '3개월 변화', value: (parseFloat(momentum60) >= 0 ? '+' : '') + momentum60 + '%', desc: '최근 60 거래일 등락률', cls: parseFloat(momentum60) >= 0 ? 'text-danger' : 'text-primary' });
+    }
+    if (maAlignment) {
+        var alignCls = maAlignment === '정배열' ? 'text-danger' : maAlignment === '역배열' ? 'text-primary' : 'text-secondary';
+        trendRows.push({ label: 'MA 배열', value: maAlignment, desc: 'MA50/100/200 배열 상태', cls: alignCls });
+    }
+
+    var contextText = generateMarketContextText(currentSymbol, price, ma50Val, ma200Val, momentum20, momentum60, maAlignment);
+
+    var tdText  = dark ? 'text-light' : 'text-dark';
+    var bgPanel = dark ? '#1a1e2e' : '#f8f9fa';
+    var bdPanel = dark ? '#2a2e39' : '#dee2e6';
+    var bgDesc  = dark ? '#0d1117'  : '#e9ecef';
+
+    var html = '';
+
+    html += '<div class="mb-3 p-3 rounded" style="background:' + bgDesc + ';border-left:3px solid #ffc107">';
+    html += '<div class="small fw-bold mb-1" style="color:#ffc107"><i class="bi ' + indexInfo.icon + ' me-1"></i>' + escHtml(indexInfo.name) + '</div>';
+    html += '<div class="small ' + tdText + '" style="line-height:1.6">' + escHtml(indexInfo.desc) + '</div>';
+    html += '</div>';
+
+    if (trendRows.length > 0) {
+        html += '<table class="table ' + (dark ? 'table-dark' : '') + ' table-sm mb-3" style="font-size:0.82rem">';
+        html += '<thead><tr class="text-secondary"><th>지표</th><th>현재 수준</th><th>의미</th></tr></thead><tbody>';
+        trendRows.forEach(function(row) {
+            html += '<tr><td class="' + tdText + '">' + escHtml(row.label) + '</td>';
+            html += '<td class="' + row.cls + ' fw-semibold">' + escHtml(row.value) + '</td>';
+            html += '<td class="text-secondary">' + escHtml(row.desc) + '</td></tr>';
+        });
+        html += '</tbody></table>';
+    }
+
+    html += '<div class="p-3 rounded mb-3" style="background:' + bgPanel + ';border:1px solid ' + bdPanel + '">';
+    html += '<div class="fw-bold mb-2" style="color:' + (dark ? '#ffc107' : '#d48800') + '"><i class="bi bi-lightbulb me-1"></i>현황 분석</div>';
+    html += '<div class="small ' + tdText + '" style="line-height:1.8">' + contextText + '</div>';
+    html += '</div>';
+
+    html += '<div class="mt-2 mb-1 small fw-semibold text-secondary"><i class="bi bi-newspaper me-1"></i>관련 뉴스</div>';
+    html += '<div id="marketIndexNewsInline"><div class="text-secondary small text-center py-2">뉴스 로딩 중...</div></div>';
+
+    html += '<div class="mt-2 text-secondary" style="font-size:0.7rem">* 기술적 지표 기반 참고 자료입니다. 실제 투자 결정 시 다양한 요인을 종합 검토하세요.</div>';
+
+    content.innerHTML = html;
+
+    // 뉴스 비동기 로드
+    try {
+        var res = await fetch('/api/stock/news?limit=5&keywords=' + encodeURIComponent(indexInfo.keywords || currentSymbol));
+        var newsEl = document.getElementById('marketIndexNewsInline');
+        if (!newsEl) return;
+        if (!res.ok) throw new Error('뉴스 로드 실패');
+        var news = await res.json();
+        if (!news || news.length === 0) {
+            newsEl.innerHTML = '<div class="text-secondary small text-center py-2">관련 뉴스 없음</div>';
+            return;
+        }
+        var dark2 = isDarkTheme();
+        newsEl.innerHTML = news.map(function(item, idx) {
+            var dateStr = formatNewsDate(item.pubDate);
+            var borderCls = idx < news.length - 1 ? ' border-bottom ' + (dark2 ? 'border-secondary' : 'border-light-subtle') : '';
+            return '<div class="py-2 px-1' + borderCls + '">' +
+                '<a href="' + escHtml(item.link) + '" target="_blank" rel="noopener noreferrer" ' +
+                'class="text-decoration-none small fw-semibold d-block mb-1 text-body" style="line-height:1.35;">' +
+                escHtml(item.title) + '</a>' +
+                '<span class="text-secondary" style="font-size:0.7rem;">' +
+                escHtml(item.source || '') + (dateStr ? ' · ' + dateStr : '') + '</span></div>';
+        }).join('');
+    } catch (e) {
+        var newsElErr = document.getElementById('marketIndexNewsInline');
+        if (newsElErr) newsElErr.innerHTML = '<div class="text-secondary small text-center py-2">뉴스 로드 실패</div>';
+    }
+}
+
+// ── 종합 매매 분석 ──
+
+function analyzeTradingSignal() {
+    if (isMarketIndex(currentSymbol)) {
+        analyzeMarketIndex();
+        return;
+    }
+
+    var panel = document.getElementById('tradingAnalysisPanel');
+    var content = document.getElementById('tradingAnalysisContent');
+    var verdictEl = document.getElementById('tradingVerdict');
+
+    // 일반 종목: 패널 제목 원복 + verdict 표시 + 숨겼던 패널 복원
+    var titleEl = document.getElementById('tradingPanelTitle');
+    if (titleEl) titleEl.innerHTML = '<i class="bi bi-lightning-charge-fill me-1"></i>종합 매매 분석';
+    if (verdictEl) verdictEl.style.display = '';
+    var maValuesPanel = document.getElementById('maValuesPanel');
+    var indicatorPanel = document.querySelector('.indicator-panel');
+    if (maValuesPanel) maValuesPanel.style.display = '';
+    if (indicatorPanel) indicatorPanel.style.display = '';
+
     if (!currentData || !currentData.candles || currentData.candles.length < 30) {
         content.innerHTML = '<div class="text-secondary small">분석에 필요한 데이터가 부족합니다 (최소 30개 캔들 필요).</div>';
         verdictEl.textContent = '';

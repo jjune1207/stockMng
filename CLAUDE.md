@@ -28,7 +28,7 @@ gradlew.bat test
 Thymeleaf SSR (`index.html`, `chart.html`) + TradingView Lightweight Charts v4 + Bootstrap 5
 
 - `index.html`: 관심 종목 관리 (소유자·그룹·종목구분 필터, 포트폴리오, 알림), 시장지표, 뉴스
-- `chart.js`: 차트 렌더링, 타임프레임, 종합 매매 분석
+- `chart.js`: 차트 렌더링, 타임프레임, 종합 매매 분석, 시장지수 현황 분석
 - `style.css`: 다크/라이트 테마
 
 ## 배포

@@ -118,7 +118,7 @@
             <!-- 종합 매수/매도 분석 -->
             <div id="tradingAnalysisPanel" class="mt-3 card bg-dark border-secondary">
                 <div class="card-header border-secondary d-flex justify-content-between align-items-center">
-                    <span class="small fw-semibold" style="color:#ffc107">
+                    <span id="tradingPanelTitle" class="small fw-semibold" style="color:#ffc107">
                         <i class="bi bi-lightning-charge-fill me-1"></i>종합 매매 분석
                     </span>
                     <span id="tradingVerdict" class="badge fs-6"></span>
@@ -183,7 +183,7 @@
             </div>
 
             <!-- MA 현재값 패널 -->
-            <div class="card bg-dark border-secondary mt-3">
+            <div class="card bg-dark border-secondary mt-3" id="maValuesPanel">
                 <div class="card-header border-secondary small text-secondary fw-semibold">
                     이동평균선 현재값
                 </div>
@@ -275,7 +275,7 @@
         if (bbLabel) bbLabel.style.color = isDark ? '#4caf50' : '#2e7d32';
 
         // 종합 매매 분석 헤더 색상
-        const tradingHeader = document.querySelector('#tradingAnalysisPanel .card-header span.fw-semibold');
+        const tradingHeader = document.getElementById('tradingPanelTitle');
         if (tradingHeader) tradingHeader.style.color = isDark ? '#ffc107' : '#b8860b';
 
         // 차트 로딩 텍스트 색상
