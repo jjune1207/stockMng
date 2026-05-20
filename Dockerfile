@@ -22,8 +22,8 @@ WORKDIR /app
 # 빌드 산출물만 복사
 COPY --from=builder /app/build/libs/stockMng-*.jar app.jar
 
-# data 디렉토리 생성 (watchlist.json, news-keywords.json 저장 위치)
-RUN mkdir -p /app/data
+# 초기 데이터 복사 (재배포 시 리셋됨 - 볼륨 미사용 시)
+COPY data/ ./data/
 
 EXPOSE 8080
 

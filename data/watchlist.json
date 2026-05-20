@@ -1,0 +1,118 @@
+[ {
+  "symbol" : "0183J0",
+  "name" : "TIGER 미국우주테크",
+  "market" : "코스피",
+  "type" : "stock",
+  "group" : "국내주식",
+  "owner" : "봉현",
+  "quantity" : 10.0,
+  "purchasePrice" : 9860.0
+}, {
+  "symbol" : "950160",
+  "name" : "코오롱티슈진",
+  "market" : "코스닥",
+  "type" : "stock",
+  "group" : "국내주식",
+  "owner" : "봉현",
+  "quantity" : 850.0,
+  "purchasePrice" : 67000.0
+}, {
+  "symbol" : "360200",
+  "name" : "ACE 미국S&P500",
+  "market" : "코스피",
+  "type" : "stock",
+  "group" : "ISA",
+  "owner" : "예준",
+  "quantity" : 153.0,
+  "purchasePrice" : 24575.0
+}, {
+  "symbol" : "367380",
+  "name" : "ACE 미국나스닥100",
+  "market" : "코스피",
+  "type" : "stock",
+  "group" : "ISA",
+  "owner" : "예준",
+  "quantity" : 85.0,
+  "purchasePrice" : 28361.0
+}, {
+  "symbol" : "284430",
+  "name" : "KODEX 200미국채혼합",
+  "market" : "코스피",
+  "type" : "stock",
+  "group" : "ISA",
+  "owner" : "예준",
+  "quantity" : 90.0,
+  "purchasePrice" : 19924.0
+}, {
+  "symbol" : "458730",
+  "name" : "TIGER 미국배당다우존스",
+  "market" : "코스피",
+  "type" : "stock",
+  "group" : "ISA",
+  "owner" : "예준",
+  "quantity" : 115.0,
+  "purchasePrice" : 14124.0
+}, {
+  "symbol" : "0183J0",
+  "name" : "TIGER 미국우주테크",
+  "market" : "코스피",
+  "type" : "stock",
+  "group" : "국내주식",
+  "owner" : "예준",
+  "quantity" : 5.0,
+  "purchasePrice" : 10668.0
+}, {
+  "symbol" : "006800",
+  "name" : "미래에셋증권",
+  "market" : "코스피",
+  "type" : "stock",
+  "group" : "국내주식",
+  "owner" : "예준",
+  "quantity" : 5.0,
+  "purchasePrice" : 64200.0
+}, {
+  "symbol" : "950160",
+  "name" : "코오롱티슈진",
+  "market" : "코스닥",
+  "type" : "stock",
+  "group" : "국내주식",
+  "owner" : "예준",
+  "quantity" : 2.0,
+  "purchasePrice" : 104300.0
+}, {
+  "symbol" : "QLD",
+  "name" : "ProShares Ultra QQQ",
+  "market" : "아멕스 증권거래소",
+  "type" : "stock",
+  "group" : "미국주식",
+  "owner" : "예준",
+  "quantity" : 1.515736,
+  "purchasePrice" : 83.3381
+}, {
+  "symbol" : "VTI",
+  "name" : "Vanguard Total Stock Market Index Fund",
+  "market" : "아멕스 증권거래소",
+  "type" : "stock",
+  "group" : "미국주식",
+  "owner" : "예준",
+  "quantity" : 0.688498,
+  "purchasePrice" : 352.7668
+}, {
+  "symbol" : "360200",
+  "name" : "ACE 미국S&P500",
+  "market" : "코스피",
+  "type" : "stock",
+  "group" : "연금저축",
+  "owner" : "예준",
+  "quantity" : 16.0,
+  "purchasePrice" : 25470.0
+}, {
+  "symbol" : "309230",
+  "name" : "ACE 미국WideMoat동일가중",
+  "market" : "코스피",
+  "type" : "stock",
+  "group" : "연금저축",
+  "owner" : "예준",
+  "quantity" : 6.0,
+  "purchasePrice" : 29852.0
+} ]
