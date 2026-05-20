@@ -1,5 +1,6 @@
 package com.example.stockchart.controller;
 
+import com.example.stockchart.auth.AuthController;
 import com.example.stockchart.dto.CandleDto;
 import com.example.stockchart.dto.MarketIndicatorDto;
 import com.example.stockchart.dto.StockPriceDto;
@@ -9,8 +10,10 @@ import com.example.stockchart.dto.WatchlistItemDto;
 import com.example.stockchart.dto.WatchlistRequestDto;
 import com.example.stockchart.service.StockDataFacade;
 import com.example.stockchart.util.IndicatorUtil;
+import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,6 +24,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -158,78 +162,152 @@ public class StockApiController {
     }
 
     @GetMapping("/watchlist")
-    public ResponseEntity<List<WatchlistItemDto>> getWatchlist() {
-        return ResponseEntity.ok(stockDataFacade.getWatchlist());
+    public ResponseEntity<List<WatchlistItemDto>> getWatchlist(HttpSession session) {
+        List<WatchlistItemDto> all = stockDataFacade.getWatchlist();
+        return ResponseEntity.ok(filterForSession(all, session));
     }
 
     @PostMapping("/watchlist")
-    public ResponseEntity<List<WatchlistItemDto>> addWatchlist(@RequestBody WatchlistRequestDto request) {
+    public ResponseEntity<List<WatchlistItemDto>> addWatchlist(
+            @RequestBody WatchlistRequestDto request, HttpSession session) {
+        String owner = isAdmin(session) && request.getOwner() != null && !request.getOwner().isBlank()
+            ? request.getOwner()
+            : sessionOwner(session);
+
         WatchlistItemDto item = WatchlistItemDto.builder()
             .symbol(request.getSymbol())
             .name(request.getName())
             .market(request.getMarket())
             .type(request.getType())
             .group(request.getGroup())
-            .owner(request.getOwner())
+            .owner(owner)
             .build();
 
-        return ResponseEntity.ok(stockDataFacade.addWatchlistItem(item));
+        List<WatchlistItemDto> result = stockDataFacade.addWatchlistItem(item);
+        return ResponseEntity.ok(filterForSession(result, session));
     }
 
     @DeleteMapping("/watchlist/{symbol}")
-    public ResponseEntity<List<WatchlistItemDto>> removeWatchlist(@PathVariable("symbol") String symbol) {
-        return ResponseEntity.ok(stockDataFacade.removeWatchlistItem(symbol));
+    public ResponseEntity<List<WatchlistItemDto>> removeWatchlist(
+            @PathVariable("symbol") String symbol, HttpSession session) {
+        if (!isAdmin(session)) {
+            assertOwnership(symbol, sessionOwner(session));
+        }
+        List<WatchlistItemDto> result = stockDataFacade.removeWatchlistItem(symbol);
+        return ResponseEntity.ok(filterForSession(result, session));
     }
 
     @GetMapping("/watchlist/groups")
-    public ResponseEntity<List<String>> getWatchlistGroups() {
-        return ResponseEntity.ok(stockDataFacade.getWatchlistGroups());
+    public ResponseEntity<List<String>> getWatchlistGroups(HttpSession session) {
+        if (isAdmin(session)) {
+            return ResponseEntity.ok(stockDataFacade.getWatchlistGroups());
+        }
+        String owner = sessionOwner(session);
+        List<String> groups = stockDataFacade.getWatchlist().stream()
+            .filter(i -> owner.equals(i.getOwner()))
+            .map(WatchlistItemDto::getGroup)
+            .filter(g -> g != null && !g.isBlank())
+            .distinct()
+            .sorted(String.CASE_INSENSITIVE_ORDER)
+            .toList();
+        return ResponseEntity.ok(groups);
     }
 
     @PutMapping("/watchlist/{symbol}/group")
     public ResponseEntity<List<WatchlistItemDto>> moveToGroup(
-        @PathVariable("symbol") String symbol,
-        @RequestBody Map<String, String> body) {
-        return ResponseEntity.ok(stockDataFacade.moveToGroup(symbol, body.get("group")));
+            @PathVariable("symbol") String symbol,
+            @RequestBody Map<String, String> body,
+            HttpSession session) {
+        if (!isAdmin(session)) {
+            assertOwnership(symbol, sessionOwner(session));
+        }
+        List<WatchlistItemDto> result = stockDataFacade.moveToGroup(symbol, body.get("group"));
+        return ResponseEntity.ok(filterForSession(result, session));
     }
 
     @DeleteMapping("/watchlist/groups/{groupName}")
     public ResponseEntity<List<WatchlistItemDto>> deleteGroup(
-        @PathVariable("groupName") String groupName,
-        @RequestParam(name = "owner", defaultValue = "") String owner) {
-        return ResponseEntity.ok(stockDataFacade.deleteWatchlistGroup(owner, groupName));
+            @PathVariable("groupName") String groupName,
+            @RequestParam(name = "owner", defaultValue = "") String owner,
+            HttpSession session) {
+        String effectiveOwner = isAdmin(session) && !owner.isBlank() ? owner : sessionOwner(session);
+        List<WatchlistItemDto> result = stockDataFacade.deleteWatchlistGroup(effectiveOwner, groupName);
+        return ResponseEntity.ok(filterForSession(result, session));
     }
 
     @PutMapping("/watchlist/groups/{groupName}")
     public ResponseEntity<List<WatchlistItemDto>> renameGroup(
-        @PathVariable("groupName") String groupName,
-        @RequestBody Map<String, String> body) {
-        return ResponseEntity.ok(stockDataFacade.renameWatchlistGroup(
-            body.getOrDefault("owner", ""), groupName, body.get("newName")));
+            @PathVariable("groupName") String groupName,
+            @RequestBody Map<String, String> body,
+            HttpSession session) {
+        String effectiveOwner = isAdmin(session) && body.containsKey("owner") && !body.get("owner").isBlank()
+            ? body.get("owner")
+            : sessionOwner(session);
+        List<WatchlistItemDto> result = stockDataFacade.renameWatchlistGroup(effectiveOwner, groupName, body.get("newName"));
+        return ResponseEntity.ok(filterForSession(result, session));
     }
 
     @GetMapping("/watchlist/owners")
-    public ResponseEntity<List<String>> getOwners() {
-        return ResponseEntity.ok(stockDataFacade.getOwners());
+    public ResponseEntity<List<String>> getOwners(HttpSession session) {
+        if (isAdmin(session)) {
+            return ResponseEntity.ok(stockDataFacade.getOwners());
+        }
+        return ResponseEntity.ok(List.of(sessionOwner(session)));
     }
 
     @PutMapping("/watchlist/owners/{ownerName}")
     public ResponseEntity<List<WatchlistItemDto>> renameOwner(
-        @PathVariable("ownerName") String ownerName,
-        @RequestBody Map<String, String> body) {
+            @PathVariable("ownerName") String ownerName,
+            @RequestBody Map<String, String> body,
+            HttpSession session) {
+        if (!isAdmin(session)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "소유자 이름 변경은 관리자만 가능합니다.");
+        }
         return ResponseEntity.ok(stockDataFacade.renameOwner(ownerName, body.get("newName")));
     }
 
     @DeleteMapping("/watchlist/owners/{ownerName}")
-    public ResponseEntity<List<WatchlistItemDto>> deleteOwner(@PathVariable("ownerName") String ownerName) {
+    public ResponseEntity<List<WatchlistItemDto>> deleteOwner(
+            @PathVariable("ownerName") String ownerName, HttpSession session) {
+        if (!isAdmin(session)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "소유자 삭제는 관리자만 가능합니다.");
+        }
         return ResponseEntity.ok(stockDataFacade.deleteOwner(ownerName));
     }
 
     @PutMapping("/watchlist/{symbol}/portfolio")
     public ResponseEntity<List<WatchlistItemDto>> updatePortfolio(
-        @PathVariable("symbol") String symbol,
-        @RequestBody Map<String, Double> body) {
-        return ResponseEntity.ok(stockDataFacade.updateWatchlistPortfolio(
-            symbol, body.get("quantity"), body.get("purchasePrice")));
+            @PathVariable("symbol") String symbol,
+            @RequestBody Map<String, Double> body,
+            HttpSession session) {
+        if (!isAdmin(session)) {
+            assertOwnership(symbol, sessionOwner(session));
+        }
+        List<WatchlistItemDto> result = stockDataFacade.updateWatchlistPortfolio(
+            symbol, body.get("quantity"), body.get("purchasePrice"));
+        return ResponseEntity.ok(filterForSession(result, session));
+    }
+
+    // --- 세션 헬퍼 ---
+
+    private String sessionOwner(HttpSession session) {
+        return (String) session.getAttribute(AuthController.SESSION_OWNER);
+    }
+
+    private boolean isAdmin(HttpSession session) {
+        return Boolean.TRUE.equals(session.getAttribute(AuthController.SESSION_IS_ADMIN));
+    }
+
+    private List<WatchlistItemDto> filterForSession(List<WatchlistItemDto> items, HttpSession session) {
+        if (isAdmin(session)) return items;
+        String owner = sessionOwner(session);
+        return items.stream().filter(i -> owner.equals(i.getOwner())).toList();
+    }
+
+    private void assertOwnership(String compositeKey, String owner) {
+        String[] parts = compositeKey.split("\\|", -1);
+        if (parts.length == 3 && !parts[1].equals(owner)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "다른 사용자의 데이터를 수정할 수 없습니다.");
+        }
     }
 }

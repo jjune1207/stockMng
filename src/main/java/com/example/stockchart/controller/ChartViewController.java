@@ -1,5 +1,7 @@
 package com.example.stockchart.controller;
 
+import com.example.stockchart.auth.AuthController;
+import jakarta.servlet.http.HttpSession;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
@@ -16,16 +18,20 @@ public class ChartViewController {
 
     /** 메인 페이지 (종목 검색 + 주요 종목 현재가 테이블) */
     @GetMapping("/")
-    public String index(Model model) {
+    public String index(Model model, HttpSession session) {
         model.addAttribute("pageTitle", "주식 분석 차트");
+        model.addAttribute("currentOwner", session.getAttribute(AuthController.SESSION_OWNER));
+        model.addAttribute("isAdmin", Boolean.TRUE.equals(session.getAttribute(AuthController.SESSION_IS_ADMIN)));
         return "index";
     }
 
     /** 종목 차트 페이지 */
     @GetMapping("/chart/{symbol}")
-    public String chart(@PathVariable("symbol") String symbol, Model model) {
+    public String chart(@PathVariable("symbol") String symbol, Model model, HttpSession session) {
         model.addAttribute("symbol", symbol);
         model.addAttribute("pageTitle", symbol + " 차트");
+        model.addAttribute("currentOwner", session.getAttribute(AuthController.SESSION_OWNER));
+        model.addAttribute("isAdmin", Boolean.TRUE.equals(session.getAttribute(AuthController.SESSION_IS_ADMIN)));
         return "chart";
     }
 
