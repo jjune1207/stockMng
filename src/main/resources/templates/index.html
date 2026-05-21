@@ -1164,24 +1164,28 @@
             if (saved) newsSettings.interval = parseInt(saved, 10) || 1800;
         } catch (e) { /* 기본값 사용 */ }
 
-        // 어드민: 소유자 선택 행 표시 + 소유자 목록 로드
+        // 소유자 선택 행 표시 + 소유자 목록 로드 (어드민 또는 서브소유자가 있는 일반 사용자)
         const ownerRow = document.getElementById('newsOwnerRow');
         const ownerSelect = document.getElementById('newsOwnerSelect');
-        if (PAGE_IS_ADMIN && ownerRow && ownerSelect) {
-            ownerRow.style.display = '';
+        if (ownerRow && ownerSelect) {
             try {
                 const ownersRes = await fetch('/api/stock/watchlist/owners');
                 if (ownersRes.ok) {
                     const owners = await ownersRes.json();
-                    ownerSelect.innerHTML = owners.map(o =>
-                        `<option value="${escHtml(o)}"${o === newsSettingsOwner ? ' selected' : ''}>${escHtml(o)}</option>`
-                    ).join('');
-                    if (!newsSettingsOwner && owners.length > 0) newsSettingsOwner = owners[0];
+                    if (owners.length > 1) {
+                        ownerRow.style.display = '';
+                        ownerSelect.innerHTML = owners.map(o =>
+                            `<option value="${escHtml(o)}"${o === newsSettingsOwner ? ' selected' : ''}>${escHtml(o)}</option>`
+                        ).join('');
+                        if (!newsSettingsOwner && owners.length > 0) newsSettingsOwner = owners[0];
+                    } else {
+                        ownerRow.style.display = 'none';
+                    }
                 }
             } catch (e) { /* 목록 로드 실패 무시 */ }
         }
 
-        const targetOwner = ownerParam !== undefined ? ownerParam : (PAGE_IS_ADMIN ? newsSettingsOwner : '');
+        const targetOwner = ownerParam !== undefined ? ownerParam : newsSettingsOwner;
         const ownerQuery = targetOwner ? `?owner=${encodeURIComponent(targetOwner)}` : '';
 
         // 키워드는 서버에서 로드
@@ -1211,8 +1215,8 @@
         const newKeywords = rawKw.split(',').map(k => k.trim()).filter(k => k.length > 0);
         newsSettings.interval = ivSelect ? parseInt(ivSelect.value, 10) : 1800;
 
-        // 키워드 서버 저장 (어드민은 선택한 owner, 일반 사용자는 서버가 세션 owner 사용)
-        const ownerQuery = PAGE_IS_ADMIN && newsSettingsOwner
+        // 키워드 서버 저장 (선택된 owner 전달, 서버에서 권한 검증)
+        const ownerQuery = newsSettingsOwner
             ? `?owner=${encodeURIComponent(newsSettingsOwner)}` : '';
         try {
             const res = await fetch('/api/stock/news-keywords' + ownerQuery, {
@@ -1240,8 +1244,8 @@
         const visible = panel.style.display !== 'none';
         panel.style.display = visible ? 'none' : 'block';
         if (!visible) {
-            // 패널 열 때 현재 owner의 키워드 표시 (어드민은 소유자 목록도 갱신)
-            loadNewsSettings(PAGE_IS_ADMIN ? newsSettingsOwner : undefined);
+            // 패널 열 때 현재 owner의 키워드 표시
+            loadNewsSettings(newsSettingsOwner || undefined);
         }
     }
 

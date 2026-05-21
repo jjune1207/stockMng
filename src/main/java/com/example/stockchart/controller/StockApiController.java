@@ -349,12 +349,18 @@ public class StockApiController {
 
     // --- 세션 헬퍼 ---
 
-    /** 뉴스 키워드 owner 결정: 어드민은 ?owner= 파라미터 우선, 일반 사용자는 세션 owner 고정 */
+    /** 뉴스 키워드 owner 결정: 어드민은 ?owner= 파라미터 우선, 일반 사용자는 자신 또는 자신의 서브소유자만 허용 */
     private String resolveNewsOwner(String ownerParam, HttpSession session) {
-        if (isAdmin(session) && ownerParam != null && !ownerParam.isBlank()) {
-            return ownerParam.trim();
-        }
         String sessionUser = sessionOwner(session);
+        if (ownerParam != null && !ownerParam.isBlank()) {
+            String trimmed = ownerParam.trim();
+            if (isAdmin(session)) {
+                return trimmed;
+            }
+            if (sessionUser != null && (trimmed.equals(sessionUser) || subOwnerMappingService.isSubOwnerOf(trimmed, sessionUser))) {
+                return trimmed;
+            }
+        }
         return sessionUser != null ? sessionUser : "";
     }
 

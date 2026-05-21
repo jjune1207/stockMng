@@ -22,7 +22,7 @@ DB 없이 네이버 증권 API와 Yahoo Finance를 활용하여 거래량 상위
 - **주요 시장 지표**: 코스피, 코스닥, S&P 500, 나스닥, 다우지수, 필라델피아반도체(SOX), VIX 공포지수 실시간 표시. WTI+환율(USD/KRW), 금(Gold)+은(Silver)은 각각 하나의 콤보 카드(위아래 2행)로 표시. 코스피/코스닥/S&P500/나스닥/다우 클릭 시 차트 상세 페이지 이동
 - **해외 종목 지원**: Yahoo Finance 연동으로 미국 주식 시세·차트 조회, 원화/달러 가격 토글. 미국 ETF는 한글 설명 표시
 - **주요뉴스**: 8개 RSS 소스(구글뉴스/다음/한국경제/연합뉴스/매일경제/이데일리/JTBC/YTN)에서 설정 키워드 필터링, 36시간 이내 뉴스, 중복 제거 후 최대 10건 수집 (30분 자동 갱신)
-- **뉴스 키워드 설정**: 소유자별로 독립된 필터 키워드를 서버(`data/news-keywords.json`)에 영속화. 어드민은 소유자 선택 드롭다운으로 각 소유자 키워드 편집 가능
+- **뉴스 키워드 설정**: 소유자별로 독립된 필터 키워드를 서버(`data/news-keywords.json`)에 영속화. 어드민은 모든 소유자 키워드 편집 가능. 서브소유자가 있는 일반 계정도 소유자 선택 드롭다운으로 자신의 서브소유자 키워드 전환 가능
 - **로그인/계정 관리**: 세션 기반 인증. 관리자(admin) 계정은 전체 소유자·계정 관리 가능. 일반 계정은 자신의 소유자와 서브소유자만 관리
 - **서브소유자**: 일반 계정이 추가할 수 있는 보조 소유자. 관심 종목/포트폴리오를 인물별로 분리 관리 (예: 가족 구성원별 포트폴리오)
 - **다크/라이트 모드 전환**: 상단 토글 버튼으로 테마 변경 (localStorage 저장, 메인/차트 페이지 모두 지원)
@@ -148,8 +148,8 @@ http://localhost:8080
 | GET | `/api/stock/market-indicators` | 주요 시장 지표 (코스피/코스닥/S&P500/나스닥/다우/SOX/VIX/WTI/환율/금/은, 5분 캐시) |
 | GET | `/api/stock/usdkrw-rate` | USD/KRW 환율 조회 |
 | GET | `/api/stock/news?limit=10&keywords=미국,나스닥` | 주요 뉴스 (8개 RSS 소스, 30분 캐시, 기본값·최대 10건). keywords 미입력 시 세션 소유자 키워드 자동 적용 |
-| GET | `/api/stock/news-keywords?owner=` | 소유자별 뉴스 필터 키워드 조회 (어드민: `?owner=` 지정, 일반: 세션 소유자 고정) |
-| PUT | `/api/stock/news-keywords?owner=` | 소유자별 뉴스 필터 키워드 업데이트 (서버 영속화) |
+| GET | `/api/stock/news-keywords?owner=` | 소유자별 뉴스 필터 키워드 조회 (어드민: 모든 소유자, 일반: 자신 또는 자신의 서브소유자) |
+| PUT | `/api/stock/news-keywords?owner=` | 소유자별 뉴스 필터 키워드 업데이트 (어드민: 모든 소유자, 일반: 자신 또는 자신의 서브소유자) |
 | POST | `/api/stock/watchlist/owners` | 서브소유자 등록 (일반 계정 가능, 세션 계정에 귀속) |
 | GET | `/api/admin/accounts` | 계정 목록 조회 (어드민 전용) |
 | GET | `/api/admin/owner-hierarchy` | 계정별 서브소유자 계층 조회 (어드민 전용) |
@@ -199,10 +199,10 @@ POST /api/stock/watchlist
 }
 ```
 
-### 요청 예시 — 뉴스 키워드 업데이트 (어드민: 특정 소유자 지정)
+### 요청 예시 — 뉴스 키워드 업데이트 (어드민 또는 자신의 서브소유자 지정)
 
 ```json
-PUT /api/stock/news-keywords?owner=홍길동
+PUT /api/stock/news-keywords?owner=혜미
 ["미국", "트럼프", "나스닥", "S&P", "다우", "NASDAQ", "코스피"]
 ```
 

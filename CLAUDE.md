@@ -52,7 +52,7 @@ Spring Boot Web + WebFlux(WebClient), Thymeleaf, Caffeine Cache, Lombok, JUnit 5
 | `/market-indicators` | 코스피·코스닥·S&P500·나스닥·다우·SOX·VIX·WTI·환율·금·은 |
 | `/top?type=stock\|etf\|us_stock\|us_etf` | 인기 종목 |
 | `/news?owner=` | 뉴스 조회 (keywords 비면 세션owner 키워드 자동 적용) |
-| `/news-keywords?owner=` | 소유자별 키워드 조회·수정 (어드민: ?owner= 필수) |
+| `/news-keywords?owner=` | 소유자별 키워드 조회·수정 (어드민: 전체, 일반: 자신·서브소유자만) |
 | `/watchlist` (CRUD) | 복합키 `symbol\|owner\|group`, 포트폴리오 PUT |
 | `/watchlist/owners/**`, `/watchlist/groups/**` | 소유자·그룹 관리 |
 
